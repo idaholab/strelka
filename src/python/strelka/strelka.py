@@ -1,5 +1,6 @@
 import glob
 import importlib
+import io
 import itertools
 import json
 import logging
@@ -410,16 +411,22 @@ class Backend(object):
                     elif self.coordinator:
                         # Pull data for file from coordinator
                         with self.tracer.start_as_current_span("lpop"):
-                            while True:
-                                pop = self.coordinator.lpop(f"data:{file.pointer}")
-                                if pop is None:
-                                    break
-                                data += pop
-
-                        # Initialize Redis pipeline
-                        pipeline = self.coordinator.pipeline(transaction=False)
+                            with io.BytesIO() as buf:
+                                lname = f"data:{file.pointer}"
+                                # the typing on the redis method is wrong
+                                pop: bytes | None
+                                while True:
+                                    pop = self.coordinator.lpop(lname)
+                                    if pop is None:
+                                        break
+                                    buf.write(pop)
+                                data = buf.getvalue()
                     else:
                         raise Exception("No data or coordinator available")
+
+                    if self.coordinator:
+                        # Initialize Redis pipeline
+                        pipeline = self.coordinator.pipeline(transaction=False)
 
                     # Match data to mime and yara flavors
                     file.add_flavors(self.match_flavors(data))
@@ -549,14 +556,15 @@ class Backend(object):
                         **{"iocs": iocs},
                     }
 
-                    # Collect events for local-only
-                    events.append(event)
 
                     # Send event back to Redis coordinator
                     if pipeline:
                         pipeline.rpush(f"event:{root_id}", format_event(event))
                         pipeline.expireat(f"event:{root_id}", expire_at)
                         pipeline.execute()
+                    else:
+                        # Collect events for local-only
+                        events.append(event)
 
                     signal.alarm(0)
 
@@ -828,7 +836,8 @@ class Scanner(object):
             return self.files, {self.key: self.event}, self.iocs
 
     def emit_file(
-        self, data: bytes, name: str = "", flavors: Optional[list[str]] = None
+        self, data: bytes, name: str = "", flavors: Optional[list[str]] = None,
+        *, force_upload: bool = False
     ) -> None:
         """Re-ingest extracted file"""
 
@@ -845,7 +854,7 @@ class Scanner(object):
                 current_span.set_attribute(f"{__namespace__}.file.size", len(data))
                 current_span.set_attribute(f"{__namespace__}.file.source", self.name)
 
-                if self.coordinator:
+                if self.coordinator and force_upload:
                     for c in chunk_string(data):
                         self.upload_to_coordinator(
                             extract_file.pointer,
