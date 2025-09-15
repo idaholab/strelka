@@ -194,12 +194,15 @@ class Backend(object):
             and backend_cfg.get("coordinator")
         ):
             try:
-                coordinator_cfg = backend_cfg.get("coordinator")
+                coordinator_cfg = backend_cfg["coordinator"]
                 coordinator_addr = coordinator_cfg.get("addr").split(":")
                 self.coordinator = redis.StrictRedis(
                     host=coordinator_addr[0],
                     port=coordinator_addr[1],
-                    db=coordinator_cfg.get("db"),
+                    db=coordinator_cfg.get("db", 0),
+                    username=coordinator_cfg.get("username"),
+                    password=coordinator_cfg.get("password"),
+                    client_name=f"strelka-backend-{os.getpid()}",
                 )
                 if self.coordinator.ping():
                     logging.debug("coordinator up")
