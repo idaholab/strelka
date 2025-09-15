@@ -1,5 +1,6 @@
 import glob
 import importlib
+import io
 import itertools
 import json
 import logging
@@ -407,11 +408,16 @@ class Backend(object):
                     elif self.coordinator:
                         # Pull data for file from coordinator
                         with self.tracer.start_as_current_span("lpop"):
-                            while True:
-                                pop = self.coordinator.lpop(f"data:{file.pointer}")
-                                if pop is None:
-                                    break
-                                data += pop
+                            with io.BytesIO() as buf:
+                                lname = f"data:{file.pointer}"
+                                # the typing on the redis method is wrong
+                                pop: bytes | None
+                                while True:
+                                    pop = self.coordinator.lpop(lname)
+                                    if pop is None:
+                                        break
+                                    buf.write(pop)
+                                data = buf.getvalue()
 
                         # Initialize Redis pipeline
                         pipeline = self.coordinator.pipeline(transaction=False)
