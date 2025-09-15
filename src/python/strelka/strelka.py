@@ -420,8 +420,6 @@ class Backend(object):
                     else:
                         raise Exception("No data or coordinator available")
 
-                    if self.coordinator:
-
                     # Match data to mime and yara flavors
                     file.add_flavors(self.match_flavors(data))
 
@@ -605,34 +603,42 @@ class Backend(object):
             neg_flavors = negatives.get("flavors", [])
             neg_filename = negatives.get("filename", None)
             neg_source = negatives.get("source", [])
+            neg_uids = [uuid.UUID(u) for u in negatives.get("uids", [])]
             pos_flavors = positives.get("flavors", [])
             pos_filename = positives.get("filename", None)
             pos_source = positives.get("source", [])
+            pos_uids = [uuid.UUID(u) for u in positives.get("uids", [])]
             assigned = {
                 "name": scanner,
                 "priority": mapping.get("priority", 5),
                 "options": mapping.get("options", {}),
             }
 
-            for neg_flavor in neg_flavors:
-                if neg_flavor in itertools.chain(*file.flavors.values()):
+            if neg_source:
+                if file.source in neg_source:
+                    return {}
+            if neg_uids:
+                if file.uid in neg_uids:
                     return {}
             if neg_filename:
                 if re.search(neg_filename, file.name):
                     return {}
-            if neg_source:
-                if file.source in neg_source:
+            for neg_flavor in neg_flavors:
+                if neg_flavor in itertools.chain(*file.flavors.values()):
                     return {}
-            for pos_flavor in pos_flavors:
-                if (
-                    pos_flavor == "*" and not ignore_wildcards
-                ) or pos_flavor in itertools.chain(*file.flavors.values()):
+            if pos_source:
+                if file.source in pos_source:
+                    return assigned
+            if pos_uids:
+                if file.uid in pos_uids:
                     return assigned
             if pos_filename:
                 if re.search(pos_filename, file.name):
                     return assigned
-            if pos_source:
-                if file.source in pos_source:
+            for pos_flavor in pos_flavors:
+                if (
+                    pos_flavor == "*" and not ignore_wildcards
+                ) or pos_flavor in itertools.chain(*file.flavors.values()):
                     return assigned
 
         return {}
