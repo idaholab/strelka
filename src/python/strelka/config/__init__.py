@@ -2,12 +2,13 @@ import hashlib
 import logging
 import logging.config
 import os
+from pathlib import Path
 
 import yaml
 
 
 class BackendConfig:
-    def __init__(self, backend_cfg_path: str = "/etc/strelka/backend.yaml") -> None:
+    def __init__(self, backend_cfg_path: str | Path = "/etc/strelka/backend.yaml") -> None:
         self.dictionary: dict = {}
 
         if not os.path.exists(backend_cfg_path):
@@ -34,6 +35,6 @@ class BackendConfig:
 
     def configure_logging(self):
         log_cfg_path = self.dictionary.get("logging_cfg")
-        if os.path.exists(log_cfg_path):
+        if log_cfg_path and os.path.exists(log_cfg_path):
             with open(log_cfg_path) as f:
                 logging.config.dictConfig(yaml.safe_load(f.read()))

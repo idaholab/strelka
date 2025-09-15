@@ -428,7 +428,7 @@ class Backend(object):
 
                     tree_dict = {
                         "node": str(file.uid),
-                        "parent": str(file.parent),
+                        "parent": str(file.parent or ""),
                         "root": str(root_id),
                     }
 
@@ -846,6 +846,7 @@ class Scanner(object):
                     name=name,
                     source=self.name,
                     depth=(self.file.depth + 1),
+                    parent=self.file.uid,
                     uid=uuid.uuid5(
                         self.file.uid,
                         json.dumps((self.name, name, *unique_keys)),
