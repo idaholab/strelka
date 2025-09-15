@@ -144,3 +144,6 @@ cython_debug/
 
 # MacOS Attributes File
 *.DS_Store
+
+# pyenv local version file
+.python-version
