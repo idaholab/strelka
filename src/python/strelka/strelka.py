@@ -13,7 +13,7 @@ import time
 import traceback
 import uuid
 from types import FrameType
-from typing import Generator, Optional, Tuple
+from typing import Generator, Hashable, Iterable, Optional, Tuple
 from urllib.parse import urlparse
 
 import inflection
@@ -72,39 +72,40 @@ class File(object):
         depth: Integer that represents how deep the file was embedded.
         flavors: Dictionary of flavors assigned to the file during distribution.
         name: String that contains the name of the file.
-        parent: UUIDv4 of the file that produced this file.
+        parent: UUID (v4/v5) of the file that produced this file.
         pointer: String that contains the location of the file bytes in Redis.
         size: Integer of data length
         source: String that describes which scanner the file originated from.
         tree: Dictionary of relationships between File objects
-        uid: String that contains a universally unique identifier (UUIDv4) used to uniquely identify the file.
+        uid: UUID (v4/v5) used to uniquely identify the file.
     """
 
     # FIXME: There doesn't appear to be any reason why pointer and uid should be different
     def __init__(
         self,
         pointer: str = "",
-        parent: str = "",
+        parent: uuid.UUID | None = None,
         depth: int = 0,
         name: str = "",
         source: str = "",
         data: Optional[bytes] = None,
+        uid: uuid.UUID | None = None,
     ) -> None:
         """Inits file object."""
         self.data: Optional[bytes] = data
         self.depth: int = depth
         self.flavors: dict[str, list[str]] = {}
         self.name: str = name
-        self.parent: str = parent
+        self.parent: uuid.UUID | None = parent
         self.pointer: str = pointer
         self.scanners: list[str] = []
         self.size: int = -1
         self.source: str = source
         self.tree: dict = {}
-        self.uid = str(uuid.uuid4())
+        self.uid: uuid.UUID = uid or uuid.uuid4()
 
         if not self.pointer:
-            self.pointer = self.uid
+            self.pointer = str(self.uid)
 
     def dictionary(self) -> dict:
         return {
@@ -311,21 +312,22 @@ class Backend(object):
             try:
                 task_info = json.loads(task_item)
             except json.JSONDecodeError:
-                root_id = task_item.decode()
+                root_id = uuid.UUID(task_item.decode())
                 # Create new file object for task, use the request root_id as the pointer
-                file = File(pointer=root_id)
+                file = File(uid=root_id)
             else:
-                root_id = task_info["id"]
+                root_id = uuid.UUID(task_info["id"])
                 try:
                     file = File(
-                        pointer=root_id, name=task_info["attributes"]["filename"]
+                        uid=root_id,
+                        name=task_info["attributes"]["filename"],
                     )
                     traceparent = task_info.get("tracecontext", "")
                 except KeyError as ex:
                     logging.debug(
                         f"No filename attached (error: {ex}) to request: {task_item}"
                     )
-                    file = File(pointer=root_id)
+                    file = File(uid=root_id)
 
             expire_at = math.ceil(expire_at)
             timeout = math.ceil(expire_at - time.time())
@@ -365,7 +367,7 @@ class Backend(object):
         )
 
     def distribute(
-        self, root_id: str, file: File, expire_at: int, traceparent: Optional[str] = ""
+        self, root_id: uuid.UUID, file: File, expire_at: int, traceparent: Optional[str] = ""
     ) -> list[dict]:
         """Distributes a file through scanners.
 
@@ -435,16 +437,16 @@ class Backend(object):
                     scanner_list = self.match_scanners(file)
 
                     tree_dict = {
-                        "node": file.uid,
-                        "parent": file.parent,
-                        "root": root_id,
+                        "node": str(file.uid),
+                        "parent": str(file.parent),
+                        "root": str(root_id),
                     }
 
                     # Since root_id comes from the request, use that instead of the file's uid
                     if file.depth == 0:
-                        tree_dict["node"] = root_id
+                        tree_dict["node"] = str(root_id)
                     if file.depth == 1:
-                        tree_dict["parent"] = root_id
+                        tree_dict["parent"] = str(root_id)
 
                     # Update the file object
                     file.scanners = [s.get("name") for s in scanner_list]
@@ -574,8 +576,6 @@ class Backend(object):
 
                 # Re-ingest extracted files
                 for scanner_file in files:
-                    scanner_file.parent = file.uid
-                    scanner_file.depth = file.depth + 1
                     events.extend(self.distribute(root_id, scanner_file, expire_at))
 
             except RequestTimeout:
@@ -614,34 +614,42 @@ class Backend(object):
             neg_flavors = negatives.get("flavors", [])
             neg_filename = negatives.get("filename", None)
             neg_source = negatives.get("source", [])
+            neg_uids = [uuid.UUID(u) for u in negatives.get("uids", [])]
             pos_flavors = positives.get("flavors", [])
             pos_filename = positives.get("filename", None)
             pos_source = positives.get("source", [])
+            pos_uids = [uuid.UUID(u) for u in positives.get("uids", [])]
             assigned = {
                 "name": scanner,
                 "priority": mapping.get("priority", 5),
                 "options": mapping.get("options", {}),
             }
 
-            for neg_flavor in neg_flavors:
-                if neg_flavor in itertools.chain(*file.flavors.values()):
+            if neg_source:
+                if file.source in neg_source:
+                    return {}
+            if neg_uids:
+                if file.uid in neg_uids:
                     return {}
             if neg_filename:
                 if re.search(neg_filename, file.name):
                     return {}
-            if neg_source:
-                if file.source in neg_source:
+            for neg_flavor in neg_flavors:
+                if neg_flavor in itertools.chain(*file.flavors.values()):
                     return {}
-            for pos_flavor in pos_flavors:
-                if (
-                    pos_flavor == "*" and not ignore_wildcards
-                ) or pos_flavor in itertools.chain(*file.flavors.values()):
+            if pos_source:
+                if file.source in pos_source:
+                    return assigned
+            if pos_uids:
+                if file.uid in pos_uids:
                     return assigned
             if pos_filename:
                 if re.search(pos_filename, file.name):
                     return assigned
-            if pos_source:
-                if file.source in pos_source:
+            for pos_flavor in pos_flavors:
+                if (
+                    pos_flavor == "*" and not ignore_wildcards
+                ) or pos_flavor in itertools.chain(*file.flavors.values()):
                     return assigned
 
         return {}
@@ -780,6 +788,7 @@ class Scanner(object):
         with self.tracer.start_as_current_span("scan") as current_span:
             start = time.time()
             self.event = dict()
+            self.file = file
             self.scanner_timeout = options.get(
                 "scanner_timeout", self.scanner_timeout or 10
             )
@@ -836,16 +845,22 @@ class Scanner(object):
             return self.files, {self.key: self.event}, self.iocs
 
     def emit_file(
-        self, data: bytes, name: str = "", flavors: Optional[list[str]] = None,
-        *, force_upload: bool = False
-    ) -> None:
+            self, data: bytes, name: str = "", flavors: Optional[list[str]] = None,
+            *, unique_keys: Iterable[Hashable] = (), force_upload: bool = False
+    ) -> uuid.UUID | None:
         """Re-ingest extracted file"""
 
         with self.tracer.start_as_current_span("emit_file") as current_span:
             try:
+                unique_keys = [*unique_keys] or [len(self.files)]
                 extract_file = File(
                     name=name,
                     source=self.name,
+                    depth=(self.file.depth + 1),
+                    uid=uuid.uuid5(
+                        self.file.uid,
+                        json.dumps((self.name, name, *unique_keys)),
+                    )
                 )
                 if flavors:
                     extract_file.add_flavors({"external": flavors})
@@ -865,6 +880,7 @@ class Scanner(object):
                     extract_file.data = data
 
                 self.files.append(extract_file)
+                return extract_file.uid
 
             except Exception:
                 logging.exception("failed to emit file")
