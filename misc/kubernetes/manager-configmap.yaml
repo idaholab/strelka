@@ -8,5 +8,6 @@ data:
         coordinator:
           addr: 'coordinator.strelka:6379'
           db: 0
+          password: null
         pool: 100
         read: 10s

@@ -464,6 +464,7 @@ func main() {
 		DB:          conf.Coordinator.DB,
 		PoolSize:    conf.Coordinator.Pool,
 		ReadTimeout: conf.Coordinator.Read,
+		Password:    conf.Coordinator.Password,
 	})
 	if err := cd.Ping(cd.Context()).Err(); err != nil {
 		log.Fatalf("failed to connect to coordinator: %v", err)
@@ -476,6 +477,7 @@ func main() {
 			DB:          conf.Gatekeeper.DB,
 			PoolSize:    conf.Gatekeeper.Pool,
 			ReadTimeout: conf.Gatekeeper.Read,
+			Password:    conf.Gatekeeper.Password,
 		})
 		if err := gk.Ping(gk.Context()).Err(); err != nil {
 			log.Fatalf("failed to connect to gatekeeper: %v", err)

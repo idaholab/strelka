@@ -467,9 +467,11 @@ For the options below, only one response setting may be configured.
 * "server": network address of the frontend server (defaults to :57314)
 * "coordinator.addr": network address of the coordinator (defaults to strelka_coordinator_1:6379)
 * "coordinator.db": Redis database of the coordinator (defaults to 0)
+* "coordinator.password": Redis password for the coordinator database (defaults to None)
 * "coordinator.blockingpoptime": If set (and >0) use redis blocking calls for task results. Incompatible with Envoy!
 * "gatekeeper.addr": network address of the gatekeeper (defaults to strelka_gatekeeper_1:6379)
 * "gatekeeper.db": Redis database of the gatekeeper (defaults to 0)
+* "gatekeeper.password": Redis password for the gatekeeper database (defaults to None)
 * "gatekeeper.ttl": time-to-live for events added to the gatekeeper (defaults to 1 hour)
 * "response.log": location where worker scan results are logged to (defaults to /var/log/strelka/strelka.log)
 * "response.report": frequency at which the frontend reports the number of files processed (no default)
@@ -488,6 +490,7 @@ For the options below, only one response setting may be configured.
 #### manager
 * "coordinator.addr": network address of the coordinator (defaults to strelka_coordinator_1:6379)
 * "coordinator.db": Redis database of the coordinator (defaults to 0)
+* "coordinator.password": Redis password for the coordinator database (defaults to None)
 
 #### backend
 The backend configuration contains two sections: one that controls the backend process and one that controls how scanners are applied to data.
@@ -500,6 +503,7 @@ The backend configuration contains two sections: one that controls the backend p
 * "limits.scanner": amount of time (in seconds) that a scanner can spend scanning a file (defaults to 150 seconds / 1.5 minutes, can be overridden per-scanner)
 * "coordinator.addr": network address of the coordinator (defaults to strelka_coordinator_1:6379)
 * "coordinator.db": Redis database of the coordinator (defaults to 0)
+* "coordinator.password": Redis password for the coordinator database (defaults to None)
 * "coordinator.blocking_pop_time_sec": If set (and >0) use redis blocking calls to retrieve file tasks. Incompatible with Envoy!
 * "tasting.mime_db": location of the MIME database used to taste files (defaults to None, system default)
 * "tasting.yara_rules": location of the directory of YARA files that contains rules used to taste files (defaults to /etc/strelka/taste/)

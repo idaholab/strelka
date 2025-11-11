@@ -36,6 +36,7 @@ func main() {
 		DB:          conf.Coordinator.DB,
 		PoolSize:    conf.Coordinator.Pool,
 		ReadTimeout: conf.Coordinator.Read,
+		Password:    conf.Coordinator.Password,
 	})
 	if err := cd.Ping(cd.Context()).Err(); err != nil {
 		log.Fatalf("failed to connect to coordinator: %v", err)

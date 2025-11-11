@@ -46,6 +46,7 @@ type ConfCoordinator struct {
 	Pool            int           // required
 	Read            time.Duration // required
 	BlockingPopTime time.Duration // optional, defaults to 0/non-blocking (polling).
+	Password        string        // optional, defaults to empty string
 }
 
 type ConfKafka struct {
@@ -67,11 +68,12 @@ type ConfS3 struct {
 }
 
 type ConfGatekeeper struct {
-	Addr string        // required
-	DB   int           // required
-	Pool int           // required
-	Read time.Duration // required
-	TTL  time.Duration // required
+	Addr     string        // required
+	DB       int           // required
+	Pool     int           // required
+	Read     time.Duration // required
+	TTL      time.Duration // required
+	Password string        // optional, defaults to empty string
 }
 
 // determines what action the client takes with responses, defaults to discarding messages
