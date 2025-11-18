@@ -5,10 +5,10 @@ import shutil
 import subprocess
 import tempfile
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanUdf(strelka.Scanner):
+class ScanUdf(Scanner):
     """Extracts files from UDF images"""
 
     EXCLUDED_ROOT_DIRS = ["[SYSTEM]"]
@@ -28,8 +28,6 @@ class ScanUdf(strelka.Scanner):
                 data, tmp_directory, scanner_timeout, expire_at, file_limit
             )
 
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             self.flags.append("vhd_7zip_extract_error")
 
@@ -58,8 +56,6 @@ class ScanUdf(strelka.Scanner):
                             stdout=subprocess.PIPE,
                             stderr=subprocess.DEVNULL,
                         ).communicate(timeout=scanner_timeout)
-                    except strelka.ScannerTimeout:
-                        raise
                     except Exception:
                         self.flags.append("vhd_7zip_extract_process_error")
 
@@ -92,13 +88,9 @@ class ScanUdf(strelka.Scanner):
                                 self.emit_file(extracted_file.read(), name=relname)
 
                             self.event["total"]["extracted"] += 1
-                        except strelka.ScannerTimeout:
-                            raise
                         except Exception:
                             self.flags.append("vhd_file_upload_error")
 
-            except strelka.ScannerTimeout:
-                raise
             except Exception:
                 self.flags.append("vhd_7zip_extract_error")
 
@@ -111,8 +103,6 @@ class ScanUdf(strelka.Scanner):
 
                 self.parse_7zip_stdout(stdout.decode("utf-8"), file_limit)
 
-            except strelka.ScannerTimeout:
-                raise
             except Exception:
                 self.flags.append("vhd_7zip_output_error")
                 return

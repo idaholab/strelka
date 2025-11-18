@@ -1,4 +1,5 @@
 import pgpdump
+import pgpdump.utils
 from pgpdump.packet import (
     CompressedDataPacket,
     Packet,
@@ -11,10 +12,10 @@ from pgpdump.packet import (
     UserIDPacket,
 )
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanPgp(strelka.Scanner):
+class ScanPgp(Scanner):
     """Collects metadata from PGP files."""
 
     def scan(self, data, file, options, expire_at):

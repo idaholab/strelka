@@ -1,9 +1,9 @@
 import entropy
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanEntropy(strelka.Scanner):
+class ScanEntropy(Scanner):
     """Calculates entropy of files."""
 
     def scan(self, data, file, options, expire_at):

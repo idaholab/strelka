@@ -4,7 +4,7 @@ import os
 
 import rarfile
 
-from strelka import strelka
+from . import Scanner
 
 HOST_OS_MAPPING = {
     0: "RAR_OS_MSDOS",
@@ -19,7 +19,7 @@ rarfile.UNRAR_TOOL = "unrar"
 rarfile.PATH_SEP = "/"
 
 
-class ScanRar(strelka.Scanner):
+class ScanRar(Scanner):
     """Extracts files from RAR archives.
 
     Attributes:

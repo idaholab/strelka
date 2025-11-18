@@ -1,10 +1,10 @@
 import io
 import tarfile
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanTar(strelka.Scanner):
+class ScanTar(Scanner):
     """Extract files from tar archives.
 
     Options:

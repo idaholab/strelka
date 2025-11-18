@@ -1,49 +1,56 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_encrypted_zip import ScanEncryptedZip as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_encrypted_zip(mocker):
+scan_encrypted_zip = fixtures.scanners.encrypted_zip
+data_zip_password_zip = fixtures.data("test_zip_password.zip")
+data_aes256_password_zip = fixtures.data("test_aes256_password.zip")
+
+
+def test_scan_encrypted_zip(
+    scan_encrypted_zip: Scanner,
+    data_zip_password_zip: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["cracked_by_wordlist"],
-        "total": {"files": 4, "extracted": 4},
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_zip_password.zip",
+    test_event = make_event(
+        files=[],
+        scan={
+            "flags": ["cracked_by_wordlist"],
+            "total": {
+                "files": 4,
+                "extracted": 4,
+            },
+        },
+    )
+    run_test_scan(
+        scanner=scan_encrypted_zip,
+        fixture=data_zip_password_zip,
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_encrypted_zip_aes256(mocker):
+def test_scan_encrypted_zip_aes256(
+    scan_encrypted_zip: Scanner,
+    data_aes256_password_zip: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["cracked_by_wordlist"],
-        "total": {"files": 4, "extracted": 4},
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_aes256_password.zip",
+    test_event = make_event(
+        files=[],
+        scan={
+            "flags": ["cracked_by_wordlist"],
+            "total": {
+                "files": 4,
+                "extracted": 4,
+            },
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_encrypted_zip,
+        fixture=data_aes256_password_zip,
+        expected=test_event,
+    )

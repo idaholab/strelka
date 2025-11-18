@@ -1,9 +1,9 @@
 from oletools import rtfobj
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanRtf(strelka.Scanner):
+class ScanRtf(Scanner):
     """Extracts files from RTF files.
 
     Options:

@@ -1,38 +1,42 @@
-from pathlib import Path
-from unittest import TestCase, mock
+from strelka.tests import (
+    File,
+    Scanner,
+    fixtures,
+    make_event,
+    make_indicator,
+    run_test_scan,
+)
 
-from strelka.scanners.scan_iqy import ScanIqy as ScanUnderTest
-from strelka.tests import run_test_scan
+
+scan_iqy = fixtures.scanners.iqy
+data_iqy = fixtures.data("test.iqy")
 
 
-def test_scan_iqy(mocker):
+def test_scan_iqy(
+    scan_iqy: Scanner,
+    data_iqy: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "address_found": True,
-        "iocs": [
-            {
-                "ioc": "github.com",
-                "ioc_type": "domain",
-                "scanner": "ScanIqy",
-            },
-            {
-                "ioc": "https://github.com/target/strelka/blob/master/docs/index.html",
-                "ioc_type": "url",
-                "scanner": "ScanIqy",
-            },
+    test_event = make_event(
+        related=[
+            make_indicator(
+                "domain-name",
+                "github.com",
+            ),
+            make_indicator(
+                "url",
+                "https://github.com/target/strelka/blob/master/docs/index.html",
+            ),
         ],
-    }
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.iqy",
+        scan={
+            "address_found": True,
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_iqy,
+        fixture=data_iqy,
+        expected=test_event,
+    )

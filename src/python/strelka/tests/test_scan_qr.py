@@ -61,11 +61,11 @@ def test_scan_qr(mocker, fmt):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
     }
 
-    test_scan_event.update(formats[fmt])
+    test_event.update(formats[fmt])
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -74,7 +74,7 @@ def test_scan_qr(mocker, fmt):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_qr_support_inverted_true(mocker):
@@ -83,7 +83,7 @@ def test_scan_qr_support_inverted_true(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["inverted"],
         "data": ["Plain Text Code"],
@@ -97,7 +97,7 @@ def test_scan_qr_support_inverted_true(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_qr_support_inverted_false(mocker):
@@ -106,7 +106,7 @@ def test_scan_qr_support_inverted_false(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": [], "data": []}
+    test_event = {"elapsed": mock.ANY, "flags": [], "data": []}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -116,4 +116,4 @@ def test_scan_qr_support_inverted_false(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

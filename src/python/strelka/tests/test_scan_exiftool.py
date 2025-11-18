@@ -1,173 +1,223 @@
-from pathlib import Path
-from unittest import TestCase, mock
+import warnings
 
-from strelka.scanners.scan_exiftool import ScanExiftool as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import (
+    File,
+    Scanner,
+    fixtures,
+    make_event,
+    parse_timestamp,
+    run_test_scan,
+)
+from strelka.util.collections import get_nested
 
 
-def test_scan_exiftool_doc(mocker):
+scan_exiftool = fixtures.scanners.exiftool
+data_doc = fixtures.data("test.doc")
+data_jpg = fixtures.data("test.jpg")
+data_msi = fixtures.data("test.msi")
+
+
+KNOWN_GOOD_VERSIONS = {"12.6", "13.1"}
+
+
+def check_exiftool_version(result) -> None:
+    if not isinstance(result, dict):
+        warnings.warn("scanner results not a dictionary?")
+        return
+    version = get_nested(result, "scan.exiftool_version")
+    if version is None:
+        warnings.warn("scan results don't contain ExifTool version")
+    elif str(version) not in KNOWN_GOOD_VERSIONS:
+        warnings.warn(f"possibly unsupported version of ExifTool: {version}")
+
+
+def test_scan_exiftool_doc(
+    scan_exiftool: Scanner,
+    data_doc: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "sourcefile": mock.ANY,
-        "exiftoolversion": 12.6,
-        "filename": mock.ANY,
-        "directory": "/tmp",
-        "filesize": "51 kB",
-        "filemodifydate": mock.ANY,
-        "fileaccessdate": mock.ANY,
-        "fileinodechangedate": mock.ANY,
-        "filepermissions": "-rw-------",
-        "filetype": "DOC",
-        "filetypeextension": "doc",
-        "mimetype": "application/msword",
-        "identification": "Word 8.0",
-        "languagecode": "English (US)",
-        "docflags": "Has picture, 1Table, ExtChar",
-        "system": "Windows",
-        "word97": "No",
-        "title": "",
-        "subject": "",
-        "author": "Ryan.OHoro",
-        "keywords": "",
-        "comments": "",
-        "template": "Normal.dotm",
-        "lastmodifiedby": "Ryan.OHoro",
-        "software": "Microsoft Office Word",
-        "createdate": "2022:12:16 19:48:00",
-        "modifydate": "2022:12:16 19:48:00",
-        "security": "None",
-        "codepage": "Windows Latin 1 (Western European)",
-        "company": "Target Corporation",
-        "charcountwithspaces": 2877,
-        "appversion": 16.0,
-        "scalecrop": "No",
-        "linksuptodate": "No",
-        "shareddoc": "No",
-        "hyperlinkschanged": "No",
-        "titleofparts": "",
-        "headingpairs": "Title, 1",
-        "compobjusertypelen": 32,
-        "compobjusertype": "Microsoft Word 97-2003 Document",
-        "lastprinted": "0000:00:00 00:00:00",
-        "revisionnumber": 2,
-        "totaledittime": "1 minute",
-        "words": 430,
-        "characters": 2452,
-        "pages": 1,
-        "paragraphs": 5,
-        "lines": 20,
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.doc",
+    test_event = make_event(
+        scan={
+            "app_version": 16.0,
+            "author": "Ryan.OHoro",
+            "characters": 2452,
+            "char_count_with_spaces": 2877,
+            "code_page": "Windows Latin 1 (Western European)",
+            "comments": "",
+            "company": "Target Corporation",
+            "comp_obj_user_type_len": 32,
+            "comp_obj_user_type": "Microsoft Word 97-2003 Document",
+            "create_date": parse_timestamp("2022-12-16 19:48:00Z"),
+            "doc_flags": "Has picture, 1Table, ExtChar",
+            "exiftool_version": ...,
+            "file_size": "51 kB",
+            "file_type": "DOC",
+            "file_type_extension": "doc",
+            "heading_pairs": "Title, 1",
+            "hyperlinks_changed": "No",
+            "identification": "Word 8.0",
+            "keywords": "",
+            "language_code": "English (US)",
+            "last_modified_by": "Ryan.OHoro",
+            "last_printed": None,
+            "lines": 20,
+            "links_up_to_date": "No",
+            "mime_type": "application/msword",
+            "modify_date": parse_timestamp("2022-12-16 19:48:00Z"),
+            "pages": 1,
+            "paragraphs": 5,
+            "revision_number": 2,
+            "scale_crop": "No",
+            "security": "None",
+            "shared_doc": "No",
+            "software": "Microsoft Office Word",
+            "subject": "",
+            "system": "Windows",
+            "template": "Normal.dotm",
+            "title": "",
+            "title_of_parts": "",
+            "total_edit_time": "1 minute",
+            "word97": "No",
+            "words": 430,
+        },
+    )
+    run_test_scan(
+        scanner=scan_exiftool,
+        fixture=data_doc,
+        expected=test_event,
+        checks=[check_exiftool_version],
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_exiftool_jpg(mocker):
+def test_scan_exiftool_jpg(
+    scan_exiftool: Scanner,
+    data_jpg: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "sourcefile": mock.ANY,
-        "exiftoolversion": 12.6,
-        "filename": mock.ANY,
-        "directory": "/tmp",
-        "filesize": "309 kB",
-        "filemodifydate": mock.ANY,
-        "fileaccessdate": mock.ANY,
-        "fileinodechangedate": mock.ANY,
-        "filepermissions": "-rw-------",
-        "filetype": "JPEG",
-        "filetypeextension": "jpg",
-        "mimetype": "image/jpeg",
-        "exifbyteorder": "Little-endian (Intel, II)",
-        "orientation": "Horizontal (normal)",
-        "xresolution": 72,
-        "yresolution": 72,
-        "resolutionunit": "inches",
-        "software": "ACDSee Pro 7",
-        "modifydate": "2021:02:06 19:55:44",
-        "ycbcrpositioning": "Centered",
-        "subsectime": 903,
-        "exifimagewidth": 1236,
-        "exifimageheight": 891,
-        "xmptoolkit": "Image::ExifTool 12.44",
-        "gpslatitude": "22 deg 54' 40.92\" S",
-        "gpslongitude": "43 deg 12' 21.30\" W",
-        "profilecmmtype": "Linotronic",
-        "profileversion": "2.1.0",
-        "profileclass": "Display Device Profile",
-        "colorspacedata": "RGB ",
-        "profileconnectionspace": "XYZ ",
-        "profiledatetime": "1998:02:09 06:49:00",
-        "profilefilesignature": "acsp",
-        "primaryplatform": "Microsoft Corporation",
-        "cmmflags": "Not Embedded, Independent",
-        "devicemanufacturer": "Hewlett-Packard",
-        "devicemodel": "sRGB",
-        "deviceattributes": "Reflective, Glossy, Positive, Color",
-        "renderingintent": "Perceptual",
-        "connectionspaceilluminant": "0.9642 1 0.82491",
-        "profilecreator": "Hewlett-Packard",
-        "profileid": 0,
-        "profilecopyright": "Copyright (c) 1998 Hewlett-Packard Company",
-        "profiledescription": "sRGB IEC61966-2.1",
-        "mediawhitepoint": "0.95045 1 1.08905",
-        "mediablackpoint": "0 0 0",
-        "redmatrixcolumn": "0.43607 0.22249 0.01392",
-        "greenmatrixcolumn": "0.38515 0.71687 0.09708",
-        "bluematrixcolumn": "0.14307 0.06061 0.7141",
-        "devicemfgdesc": "IEC http://www.iec.ch",
-        "devicemodeldesc": "IEC 61966-2.1 Default RGB colour space - sRGB",
-        "viewingconddesc": "Reference Viewing Condition in IEC61966-2.1",
-        "viewingcondilluminant": "19.6445 20.3718 16.8089",
-        "viewingcondsurround": "3.92889 4.07439 3.36179",
-        "viewingcondilluminanttype": "D50",
-        "luminance": "76.03647 80 87.12462",
-        "measurementobserver": "CIE 1931",
-        "measurementbacking": "0 0 0",
-        "measurementgeometry": "Unknown",
-        "measurementflare": "0.999%",
-        "measurementilluminant": "D65",
-        "technology": "Cathode Ray Tube Display",
-        "redtrc": "(Binary data 2060 bytes, use -b option to extract)",
-        "greentrc": "(Binary data 2060 bytes, use -b option to extract)",
-        "bluetrc": "(Binary data 2060 bytes, use -b option to extract)",
-        "comment": "Colégio Militar do Rio de Janeiro (J David, 1906)",
-        "imagewidth": 1236,
-        "imageheight": 891,
-        "encodingprocess": "Baseline DCT, Huffman coding",
-        "bitspersample": 8,
-        "colorcomponents": 3,
-        "ycbcrsubsampling": "YCbCr4:2:2 (2 1)",
-        "imagesize": "1236x891",
-        "megapixels": 1.1,
-        "subsecmodifydate": "2021:02:06 19:55:44.903",
-        "gpslatituderef": "South",
-        "gpslongituderef": "West",
-        "gpsposition": "22 deg 54' 40.92\" S, 43 deg 12' 21.30\" W",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.jpg",
+    test_event = make_event(
+        scan={
+            "exiftool_version": ...,
+            "file_size": "309 kB",
+            "file_type": "JPEG",
+            "file_type_extension": "jpg",
+            "mime_type": "image/jpeg",
+            "exif_byte_order": "Little-endian (Intel, II)",
+            "orientation": "Horizontal (normal)",
+            "x_resolution": 72,
+            "y_resolution": 72,
+            "resolution_unit": "inches",
+            "software": "ACDSee Pro 7",
+            "modify_date": parse_timestamp("2021-02-06 19:55:44Z"),
+            "ycbcr_positioning": "Centered",
+            "sub_sec_time": 903,
+            "exif_image_width": 1236,
+            "exif_image_height": 891,
+            "xmp_toolkit": "Image::ExifTool 12.44",
+            "gps_latitude": "22 deg 54' 40.92\" S",
+            "gps_longitude": "43 deg 12' 21.30\" W",
+            "profile_cmm_type": "Linotronic",
+            "profile_version": "2.1.0",
+            "profile_class": "Display Device Profile",
+            "color_space_data": "RGB ",
+            "profile_connection_space": "XYZ ",
+            "profile_date_time": parse_timestamp("1998-02-09 06:49:00Z"),
+            "profile_file_signature": "acsp",
+            "primary_platform": "Microsoft Corporation",
+            "cmm_flags": "Not Embedded, Independent",
+            "device_manufacturer": "Hewlett-Packard",
+            "device_model": "sRGB",
+            "device_attributes": "Reflective, Glossy, Positive, Color",
+            "rendering_intent": "Perceptual",
+            "connection_space_illuminant": "0.9642 1 0.82491",
+            "profile_creator": "Hewlett-Packard",
+            "profile_id": 0,
+            "profile_copyright": "Copyright (c) 1998 Hewlett-Packard Company",
+            "profile_description": "sRGB IEC61966-2.1",
+            "media_white_point": "0.95045 1 1.08905",
+            "media_black_point": "0 0 0",
+            "red_matrix_column": "0.43607 0.22249 0.01392",
+            "green_matrix_column": "0.38515 0.71687 0.09708",
+            "blue_matrix_column": "0.14307 0.06061 0.7141",
+            "device_mfg_desc": "IEC http://www.iec.ch",
+            "device_model_desc": "IEC 61966-2.1 Default RGB colour space - sRGB",
+            "viewing_cond_desc": "Reference Viewing Condition in IEC61966-2.1",
+            "viewing_cond_illuminant": "19.6445 20.3718 16.8089",
+            "viewing_cond_surround": "3.92889 4.07439 3.36179",
+            "viewing_cond_illuminant_type": "D50",
+            "luminance": "76.03647 80 87.12462",
+            "measurement_observer": "CIE 1931",
+            "measurement_backing": "0 0 0",
+            "measurement_geometry": "Unknown",
+            "measurement_flare": "0.999%",
+            "measurement_illuminant": "D65",
+            "technology": "Cathode Ray Tube Display",
+            "red_trc": ...,
+            "green_trc": ...,
+            "blue_trc": ...,
+            "comment": "Colégio Militar do Rio de Janeiro (J David, 1906)",
+            "image_width": 1236,
+            "image_height": 891,
+            "encoding_process": "Baseline DCT, Huffman coding",
+            "bits_per_sample": 8,
+            "color_components": 3,
+            "ycbcr_sub_sampling": "YCbCr4:2:2 (2 1)",
+            "image_size": "1236x891",
+            "megapixels": 1.1,
+            "sub_sec_modify_date": parse_timestamp("2021-02-06 19:55:44.903Z"),
+            "gps_latitude_ref": "South",
+            "gps_longitude_ref": "West",
+            "gps_position": "22 deg 54' 40.92\" S, 43 deg 12' 21.30\" W",
+        },
+    )
+    run_test_scan(
+        scanner=scan_exiftool,
+        fixture=data_jpg,
+        expected=test_event,
+        checks=[check_exiftool_version],
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+
+def test_scan_exiftool_msi(
+    scan_exiftool: Scanner,
+    data_msi: File,
+) -> None:
+    """
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
+    """
+    test_event = make_event(
+        scan={
+            "exiftool_version": ...,
+            "author": "Target",
+            "code_page": "Windows Latin 1 (Western European)",
+            "comments": "This installer database contains the logic and data "
+            "required to install StrelkaMSITest.",
+            "create_date": parse_timestamp("2023-08-07 11:59:38Z"),
+            "file_size": "33 kB",
+            "file_type": "FPX",
+            "file_type_extension": "fpx",
+            "keywords": "Installer",
+            "mime_type": "image/vnd.fpx",
+            "modify_date": parse_timestamp("2023-08-07 11:59:38Z"),
+            "pages": 200,
+            "revision_number": "{3F5D9FF7-E061-48CF-95B2-0AA7C9E5DE2A}",
+            "security": "Read-only recommended",
+            "software": "Windows Installer XML Toolset (3.11.2.4516)",
+            "subject": "StrelkaMSITest",
+            "template": "Intel;1033",
+            "title": "Installation Database",
+            "words": 2,
+        },
+    )
+    run_test_scan(
+        scanner=scan_exiftool,
+        fixture=data_msi,
+        expected=test_event,
+        checks=[check_exiftool_version],
+    )

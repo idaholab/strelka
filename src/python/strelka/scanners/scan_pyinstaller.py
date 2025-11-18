@@ -1,5 +1,5 @@
-from strelka import strelka
-from strelka.auxiliary.pyinstaller.readers import (
+from . import Scanner
+from ..auxiliary.pyinstaller.readers import (
     PKG_ITEM_BINARY,
     PKG_ITEM_DATA,
     PKG_ITEM_DEPENDENCY,
@@ -14,7 +14,7 @@ from strelka.auxiliary.pyinstaller.readers import (
 )
 
 
-class ScanPyinstaller(strelka.Scanner):
+class ScanPyinstaller(Scanner):
     """
     Collects metadata and extracts pysource files from PyInstaller binaries.
 

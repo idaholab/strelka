@@ -4,10 +4,10 @@ import os
 
 import yara
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanYara(strelka.Scanner):
+class ScanYara(Scanner):
     """Scans files with YARA.
 
     Attributes:

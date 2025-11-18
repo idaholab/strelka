@@ -1,57 +1,76 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_footer import ScanFooter as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_footer_txt(mocker):
+scan_footer = fixtures.scanners.footer
+data_txt = fixtures.data("test.txt")
+data_exe = fixtures.data("test.exe")
+
+
+def test_scan_footer_txt(
+    scan_footer: Scanner,
+    data_txt: File,
+) -> None:
     """
-    Pass: Sample event matches output of the scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of the scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "footer": b"itae. Et tortor consequat id porta nibh venenatis.",
-        "backslash": "itae. Et tortor consequat id porta nibh venenatis.",
-        "hex": b"697461652e20457420746f72746f7220636f6e73657175617420696420706f727461206e6962682076656e656e617469732e",
-        "raw": b"itae. Et tortor consequat id porta nibh venenatis.",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.txt",
-        options={"encodings": ["classic", "raw", "hex", "backslash"]},
+    test_event = make_event(
+        scan={
+            "footer": b"itae. Et tortor consequat id porta nibh venenatis.",
+            "backslash": "itae. Et tortor consequat id porta nibh venenatis.",
+            "hex": (
+                b"697461652e20457420746f72746f7220636f6e73657175617420696420706f727461"
+                b"206e6962682076656e656e617469732e"
+            ),
+            "raw": b"itae. Et tortor consequat id porta nibh venenatis.",
+        },
+    )
+    run_test_scan(
+        scanner=scan_footer,
+        fixture=data_txt,
+        options={
+            "encodings": ["classic", "raw", "hex", "backslash"],
+        },
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_footer_exe(mocker):
+def test_scan_footer_exe(
+    scan_footer: Scanner,
+    data_exe: File,
+) -> None:
     """
-    Pass: Sample event matches output of the scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of the scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "footer": b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-        "backslash": "\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00",
-        "hex": b"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-        "raw": b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.exe",
-        options={"encodings": ["classic", "raw", "hex", "backslash"]},
+    test_event = make_event(
+        scan={
+            "footer": (
+                b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            ),
+            "backslash": (
+                r"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                r"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                r"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            ),
+            "hex": (
+                b"00000000000000000000000000000000000000000000000000000000000000000000"
+                b"00000000000000000000000000000000"
+            ),
+            "raw": (
+                b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+                b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            ),
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_footer,
+        fixture=data_exe,
+        options={
+            "encodings": ["classic", "raw", "hex", "backslash"],
+        },
+        expected=test_event,
+    )

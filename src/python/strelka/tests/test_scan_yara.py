@@ -11,7 +11,7 @@ def test_scan_yara(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "hex": [],
@@ -35,7 +35,7 @@ def test_scan_yara(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_bad_yara(mocker):
@@ -47,7 +47,7 @@ def test_scan_bad_yara(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [
             'compiling_error_syntax_/strelka/strelka/tests/fixtures/test_elk_linux_torte.yara(31): undefined identifier "is__elf"',
@@ -74,7 +74,7 @@ def test_scan_bad_yara(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_yara_hex_extraction(mocker):
@@ -93,7 +93,7 @@ def test_scan_yara_hex_extraction(mocker):
         "rule": "hex_extraction_test",
     }
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "hex": [matched_hex],
@@ -121,7 +121,7 @@ def test_scan_yara_hex_extraction(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_yara_meta(mocker):
@@ -130,7 +130,7 @@ def test_scan_yara_meta(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "collection": [],
         "detection": [
             {
@@ -193,4 +193,4 @@ def test_scan_yara_meta(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

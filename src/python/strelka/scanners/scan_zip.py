@@ -4,10 +4,10 @@ import zlib
 
 import pyzipper
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanZip(strelka.Scanner):
+class ScanZip(Scanner):
     """Extracts files from ZIP archives.
 
     Attributes:

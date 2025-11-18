@@ -2,10 +2,10 @@ import os
 import subprocess
 import tempfile
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanUpx(strelka.Scanner):
+class ScanUpx(Scanner):
     """Decompresses UPX packed files.
 
     Options:

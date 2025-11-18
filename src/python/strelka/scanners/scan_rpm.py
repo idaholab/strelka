@@ -2,10 +2,10 @@ import tempfile
 
 import rpmfile
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanRpm(strelka.Scanner):
+class ScanRpm(Scanner):
     """Collects metadata and extracts files from RPM files.
 
     Options:

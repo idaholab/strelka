@@ -1,9 +1,9 @@
 import tnefparse
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanTnef(strelka.Scanner):
+class ScanTnef(Scanner):
     """Collects metadata and extract files from TNEF files."""
 
     def scan(self, data, file, options, expire_at):
@@ -19,8 +19,6 @@ class ScanTnef(strelka.Scanner):
 
             try:
                 object_data = tnef_object.data.strip(b"\0") or None
-            except strelka.ScannerTimeout:
-                raise
             except Exception:
                 object_data = tnef_object.data
 

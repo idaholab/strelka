@@ -1,19 +1,25 @@
 import base64
+from datetime import UTC
 import email
 import email.header
+import email.message
+import html
 import logging
 
 import eml_parser
-import pytz
 
-from strelka import strelka
+from . import Options, Scanner
+from ..model import Date, File
+from ..util import unquote
+from ..util.collections import get_nested
+
 
 # Configure logging to suppress warnings for fontTools
 fonttools_logger = logging.getLogger("fontTools.subset")
 fonttools_logger.setLevel(logging.WARNING)
 
 
-class ScanEmail(strelka.Scanner):
+class ScanEmail(Scanner):
     """
     Extracts and analyzes metadata, attachments, and generates thumbnails from email messages.
 
@@ -59,13 +65,7 @@ class ScanEmail(strelka.Scanner):
 
     """
 
-    def scan(
-        self,
-        data: bytes,
-        file: strelka.File,
-        options: dict,
-        expire_at: int,
-    ) -> None:
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         """
         Processes the email, extracts metadata, and attachments.
 
@@ -78,121 +78,73 @@ class ScanEmail(strelka.Scanner):
         Processes the email to extract metadata and attachments.
         """
 
-        # Initialize data structures for storing scan results
-        attachments = []
-        self.event["total"] = {"attachments": 0, "extracted": 0}
-
         # Parse email contents
         try:
-            # Open and parse email byte string
-            ep = eml_parser.EmlParser(
-                include_attachment_data=True, include_raw_body=True
-            )
-            parsed_eml = ep.decode_email_bytes(data)
-
-            # Check if email was parsed properly and attempt to deconflict and reload.
-            if not (parsed_eml["header"]["subject"] and parsed_eml["header"]["header"]):
-                if b"\nReceived: from " in data:
-                    data = (
-                        data.rpartition(b"\nReceived: from ")[1]
-                        + data.rpartition(b"\nReceived: from ")[2]
-                    )[1:]
-                elif b"Start mail input; end with <CRLF>.<CRLF>\n" in data:
-                    data = data.rpartition(
-                        b"Start mail input; end with <CRLF>.<CRLF>\n"
-                    )[2]
-                parsed_eml = ep.decode_email_bytes(data)
-
-            # Extract body content and domains
-            if "body" in parsed_eml:
-                for body in parsed_eml["body"]:
-                    if "content_type" in body:
-                        if body["content_type"] == "text/plain":
-                            if len(body["content"]) <= 200:
-                                self.event["body"] = body["content"]
-                            else:
-                                self.event["body"] = (
-                                    body["content"][:100]
-                                    + "..."
-                                    + body["content"][-100:]
-                                )
-                    else:
-                        self.event["body"] = (
-                            body["content"][:100] + "..." + body["content"][-100:]
-                        )
-                    if "domain" in body:
-                        if "domain" in self.event:
-                            self.event["domains"] += body["domain"]
-                        else:
-                            self.event["domains"] = body["domain"]
-
-            # Extract attachment details and raw data
-            if "attachment" in parsed_eml:
-                self.event["attachments"] = {
-                    "filenames": [],
-                    "hashes": [],
-                    "totalsize": 0,
-                }
-                for attachment in parsed_eml["attachment"]:
-                    self.event["attachments"]["filenames"].append(
-                        attachment["filename"]
-                    )
-                    self.event["attachments"]["hashes"].append(
-                        attachment["hash"]["md5"]
-                    )
-                    self.event["attachments"]["totalsize"] += attachment["size"]
-                    attachments.append(
-                        {
-                            "name": attachment["filename"],
-                            "content-type": attachment["content_header"][
-                                "content-type"
-                            ][0],
-                            "raw": base64.b64decode(attachment["raw"]),
-                        }
-                    )
+            parsed_eml = self.parse_eml(data)
 
             # Extract email header information
-            self.event["subject"] = parsed_eml["header"].get("subject", "")
-            self.event["to"] = parsed_eml["header"].get("to", "")
-            self.event["from"] = parsed_eml["header"].get("from", "")
-            date_header = parsed_eml["header"].get("date")
-            if date_header:
-                self.event["date_utc"] = (
-                    date_header.astimezone(pytz.utc).isoformat()[:-6] + ".000Z"
-                )
-            header = parsed_eml.get("header", {}).get("header", {})
-            message_id = header.get("message-id", [])[0] if header else None
-            self.event["message_id"] = (
-                str(message_id.lstrip("<").rstrip(">")) if message_id else ""
+            header = parsed_eml["header"]
+            self.event.update(
+                {
+                    "total": {
+                        "attachments": 0,
+                        "attachment_bytes": 0,
+                        "extracted": 0,
+                    },
+                    "subject": header.get("subject", ""),
+                    "to": header.get("to", []),
+                    "cc": header.get("cc", []),
+                    "from": header.get("from", ""),
+                    "message_id": unquote(
+                        get_nested(header, "header.message-id", [""])[0], "<>"
+                    ),
+                    "date_utc": (d := header.get("date")) and d.astimezone(UTC),
+                    # these two fields have nondeterministic ordering because eml_parser
+                    # calls `list(set([...]))` when storing them
+                    "received_domain": set(header.get("received_domain", ())),
+                    "received_ip": set(header.get("received_ip", ())),
+                    "domains": [],
+                }
             )
-            self.event["received_domain"] = parsed_eml["header"].get(
-                "received_domain", []
-            )
-            self.event["received_ip"] = parsed_eml["header"].get("received_ip", [])
 
-            # Process attachments
-            if attachments:
-                for attachment in attachments:
-                    self.event["total"]["attachments"] += 1
-                    name = attachment["name"]
-                    try:
-                        flavors = [
-                            attachment["content-type"]
-                            .encode("utf-8")
-                            .partition(b";")[0]
-                        ]
-                    except Exception as e:
-                        self.flags.append(
-                            f"{self.__class__.__name__}: email_extract_attachment_error: {str(e)[:50]}"
-                        )
-                    # Send extracted file back to Strelka
-                    self.emit_file(attachment["raw"], name=name, flavors=flavors)
+            # Extract body content and domains
+            # FIXME[elleste]: this only extracts the final body in the email?
+            domains = set()
+            for body in parsed_eml.get("body", []):
+                if "content_type" in body:
+                    if body["content_type"] == "text/plain":
+                        if len(body["content"]) <= 200:
+                            self.event["body"] = body["content"]
+                        else:
+                            self.event["body"] = (
+                                body["content"][:100] + "..." + body["content"][-100:]
+                            )
+                else:
+                    self.event["body"] = (
+                        body["content"][:100] + "..." + body["content"][-100:]
+                    )
+                if "domain" in body:
+                    domains.update(body["domain"])
+
+            # this is handled in eml_parser using a `Counter()` object,
+            # which stores its values in a nondeterministic order; this
+            # fixes the field so it is deterministic in our event
+            self.event["domains"].extend(sorted(domains))
+
+            # Extract attachment details and raw data
+            for attachment in parsed_eml.get("attachment", []):
+                # try to send attachment contents back to Strelka
+                self.event["total"]["attachment_bytes"] += attachment["size"]
+                self.event["total"]["attachments"] += 1
+                if self.emit_file(
+                    base64.b64decode(attachment["raw"]),
+                    name=attachment["filename"],
+                    mime_type={attachment["mime_type_short"]},
+                ):
                     self.event["total"]["extracted"] += 1
 
         except Exception as e:
-            self.flags.append(
-                f"{self.__class__.__name__}: email_parse_error: {str(e)[:50]}"
-            )
+            self.add_flag("email_parse_error", e)
 
     @staticmethod
     def decode_and_format_header(msg: email.message.Message, header_name: str) -> str:
@@ -219,7 +171,26 @@ class ScanEmail(strelka.Scanner):
             if isinstance(field_value, bytes):
                 field_value = field_value.decode(decoded_header[1] or "utf-8")
         except Exception:
-            field_value = "&lt;Unknown&gt;"
+            field_value = "<Unknown>"
 
-        # Replace angle brackets for HTML safety
-        return field_value.replace("<", "&lt;").replace(">", "&gt;")
+        # Escape the result for HTML safety
+        return html.escape(field_value, quote=True)
+
+    @staticmethod
+    def parse_eml(data: bytes) -> dict:
+        # Open and parse email byte string
+        ep = eml_parser.EmlParser(include_attachment_data=True, include_raw_body=True)
+        parsed_eml = ep.decode_email_bytes(data)
+
+        # Check if email was parsed properly and attempt to deconflict and reload.
+        if not (parsed_eml["header"]["subject"] and parsed_eml["header"]["header"]):
+            if b"\nReceived: from " in data:
+                data = (
+                    data.rpartition(b"\nReceived: from ")[1]
+                    + data.rpartition(b"\nReceived: from ")[2]
+                )[1:]
+            elif b"Start mail input; end with <CRLF>.<CRLF>\n" in data:
+                data = data.rpartition(b"Start mail input; end with <CRLF>.<CRLF>\n")[2]
+            parsed_eml = ep.decode_email_bytes(data)
+
+        return parsed_eml

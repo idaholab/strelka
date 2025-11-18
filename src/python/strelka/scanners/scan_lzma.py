@@ -1,25 +1,24 @@
 import io
 import lzma
 
-from strelka import strelka
+from . import File, Options, Scanner
+from ..model import Date
 
 
-class ScanLzma(strelka.Scanner):
+class ScanLzma(Scanner):
     """Decompresses LZMA files."""
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         try:
-            with io.BytesIO(data) as lzma_io:
-                with lzma.LZMAFile(filename=lzma_io) as lzma_obj:
-                    try:
-                        decompressed = lzma_obj.read()
-                        self.event["size"] = len(decompressed)
-
-                        # Send extracted file back to Strelka
-                        self.emit_file(decompressed, name=file.name)
-
-                    except EOFError:
-                        self.flags.append("eof_error")
-
+            with (
+                io.BytesIO(data) as data_fh,
+                lzma.LZMAFile(filename=data_fh) as lzma_fh,
+            ):
+                self.emit_file(
+                    lzma_fh.read(),
+                    name=":lzma-contents",
+                )
         except lzma.LZMAError:
-            self.flags.append("lzma_error")
+            self.add_flag("decompression_error")
+        except EOFError:
+            self.add_flag("eof_error")

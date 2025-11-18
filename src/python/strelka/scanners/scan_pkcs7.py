@@ -2,10 +2,10 @@ import tempfile
 
 from M2Crypto import SMIME, X509
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanPkcs7(strelka.Scanner):
+class ScanPkcs7(Scanner):
     """Extracts files from PKCS7 certificate files."""
 
     def scan(self, data, file, options, expire_at):

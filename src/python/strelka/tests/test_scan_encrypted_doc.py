@@ -1,111 +1,83 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_encrypted_doc import ScanEncryptedDoc as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_encrypted_doc(mocker):
+scan_encrypted_doc = fixtures.scanners.encrypted_doc
+data_password_doc = fixtures.data("test_password.doc")
+data_password_docx = fixtures.data("test_password.docx")
+data_password_brute_doc = fixtures.data("test_password_brute.doc")
+data_password_brute_docx = fixtures.data("test_password_brute.docx")
+data_passwords = fixtures.helpers("test_passwords.dat")
+
+
+def test_scan_encrypted_doc(
+    scan_encrypted_doc: Scanner,
+    data_password_doc: File,
+    data_passwords: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["cracked_by_wordlist"],
-        "cracked_password": b"Password1!",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_password.doc",
-        options={
-            "log_pws": True,
-            "password_file": str(
-                Path(Path(__file__).parent / "helpers/test_passwords.dat")
-            ),
+    test_event = make_event(
+        scan={
+            "flags": ["cracked_by_wordlist"],
+            "cracked_password": b"Password1!",
         },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
-
-
-def test_scan_encrypted_docx(mocker):
-    """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
-    """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["cracked_by_wordlist"],
-        "cracked_password": b"Password1!",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_password.docx",
+    run_test_scan(
+        scanner=scan_encrypted_doc,
+        fixture=data_password_doc,
         options={
             "log_pws": True,
-            "password_file": str(
-                Path(Path(__file__).parent / "helpers/test_passwords.dat")
-            ),
+            "password_file": data_passwords.name,
         },
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_encrypted_doc_brute(mocker):
+def test_scan_encrypted_docx(
+    scan_encrypted_doc: Scanner,
+    data_password_docx: File,
+    data_passwords: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["cracked_by_incremental"],
-        "cracked_password": b"aaa",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_password_brute.doc",
+    test_event = make_event(
+        scan={
+            "flags": ["cracked_by_wordlist"],
+            "cracked_password": b"Password1!",
+        },
+    )
+    run_test_scan(
+        scanner=scan_encrypted_doc,
+        fixture=data_password_docx,
         options={
-            "scanner_timeout": 120,
             "log_pws": True,
-            "brute_force": True,
-            "min_length": 1,
-            "max_length": 3,
+            "password_file": data_passwords.name,
         },
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_encrypted_docx_brute(mocker):
+def test_scan_encrypted_doc_brute(
+    scan_encrypted_doc: Scanner,
+    data_password_brute_doc: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["cracked_by_incremental"],
-        "cracked_password": b"aaa",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_password_brute.docx",
+    test_event = make_event(
+        scan={
+            "flags": ["cracked_by_incremental"],
+            "cracked_password": b"aaa",
+        },
+    )
+    run_test_scan(
+        scanner=scan_encrypted_doc,
+        fixture=data_password_brute_doc,
         options={
             "scanner_timeout": 120,
             "log_pws": True,
@@ -113,7 +85,33 @@ def test_scan_encrypted_docx_brute(mocker):
             "min_length": 1,
             "max_length": 3,
         },
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+
+def test_scan_encrypted_docx_brute(
+    scan_encrypted_doc: Scanner,
+    data_password_brute_docx: File,
+) -> None:
+    """
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
+    """
+    test_event = make_event(
+        scan={
+            "flags": ["cracked_by_incremental"],
+            "cracked_password": b"aaa",
+        },
+    )
+    run_test_scan(
+        scanner=scan_encrypted_doc,
+        fixture=data_password_brute_docx,
+        options={
+            "scanner_timeout": 120,
+            "log_pws": True,
+            "brute_force": True,
+            "min_length": 1,
+            "max_length": 3,
+        },
+        expected=test_event,
+    )

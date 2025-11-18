@@ -5,36 +5,39 @@ strelka-backend
 Command line utility for running Strelka backend server components.
 """
 import argparse
+from pathlib import Path
 
 import strelka.config
-import strelka.strelka
+import strelka.backend.redis
+import strelka.plugins
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="strelka-worker",
-        description="runs Strelka workers",
-        usage="%(prog)s [options]",
+        prog="strelka-backend",
+    )
+    parser.add_argument(
+        "-P", "--path",
+        metavar="DIR",
+        default=[],
+        type=Path,
+        action="append",
+        help="additional location(s) to find plugins",
     )
     parser.add_argument(
         "-c",
-        "--worker-config",
-        action="store",
-        dest="backend_cfg_path",
-        help="path to server configuration file",
+        "--backend-cfg-path",
+        type=Path,
+        default=Path("/etc/strelka/backend.yaml"),
+        help="path to backend configuration file",
     )
     args = parser.parse_args()
 
-    if args.backend_cfg_path:
-        config = strelka.config.BackendConfig(args.backend_cfg_path)
-    else:
-        config = strelka.config.BackendConfig()
-
-    if config:
-        backend = strelka.strelka.Backend(config.dictionary)
-        backend.work()
-    else:
-        raise Exception("failed to initialize configuration")
+    config = strelka.config.BackendConfig(args.backend_cfg_path)
+    config.configure_logging()
+    strelka.plugins.register_plugin_paths(args.path)
+    backend = strelka.backend.redis.RedisBackend(config)
+    backend.work()
 
 
 if __name__ == "__main__":

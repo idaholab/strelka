@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanLsb(strelka.Scanner):
+class ScanLsb(Scanner):
     """This scanner checks if there is any hidden strings at the end of each RGB value"""
 
     def scan(self, data, file, options, expire_at):

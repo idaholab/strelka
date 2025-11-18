@@ -11,7 +11,7 @@ def test_scan_rar(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 3, "extracted": 3},
@@ -64,7 +64,7 @@ def test_scan_rar(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_file_limit(mocker):
@@ -73,7 +73,7 @@ def test_scan_rar_file_limit(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["file_count_limit"],
         "total": {"files": 3, "extracted": 1},
@@ -134,7 +134,7 @@ def test_scan_rar_file_limit(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_file_limit_no_meta(mocker):
@@ -143,7 +143,7 @@ def test_scan_rar_file_limit_no_meta(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["file_count_limit"],
         "total": {"files": 3, "extracted": 1},
@@ -180,7 +180,7 @@ def test_scan_rar_file_limit_no_meta(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_crack_pws_unencrypted(mocker):
@@ -189,7 +189,7 @@ def test_scan_rar_crack_pws_unencrypted(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 3, "extracted": 3},
@@ -250,7 +250,7 @@ def test_scan_rar_crack_pws_unencrypted(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password(mocker):
@@ -259,7 +259,7 @@ def test_scan_rar_password(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["password_protected"],
         "total": {"files": 3, "extracted": 3},
@@ -320,7 +320,7 @@ def test_scan_rar_password(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_log_pwd(mocker):
@@ -329,7 +329,7 @@ def test_scan_rar_password_log_pwd(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["password_protected"],
         "password": ["password"],
@@ -391,7 +391,7 @@ def test_scan_rar_password_log_pwd(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_crack_pws(mocker):
@@ -400,7 +400,7 @@ def test_scan_rar_password_crack_pws(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["password_protected"],
         "total": {"files": 3, "extracted": 0},
@@ -461,7 +461,7 @@ def test_scan_rar_password_crack_pws(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_mixed(mocker):
@@ -470,7 +470,7 @@ def test_scan_rar_password_mixed(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["password_protected", "no_password_match_found"],
         "password": ["password", "infected"],
@@ -544,7 +544,7 @@ def test_scan_rar_password_mixed(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 #
@@ -560,7 +560,7 @@ def test_scan_rar_password_mixed(mocker):
 #     Failure: Unable to load file or sample event fails to match.
 #     """
 #
-#     test_scan_event = {
+#     test_event = {
 #         "elapsed": mock.ANY,
 #         "flags": ["password_protected", "encrypted_filenames"],
 #         "total": {"files": 3, "extracted": 3},
@@ -620,7 +620,7 @@ def test_scan_rar_password_mixed(mocker):
 #     )
 #
 #     TestCase.maxDiff = None
-#     TestCase().assertDictEqual(test_scan_event, scanner_event)
+#     TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_mixed_encrypted_headers_nomatch(mocker):
@@ -629,7 +629,7 @@ def test_scan_rar_password_mixed_encrypted_headers_nomatch(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [
             "password_protected",
@@ -659,7 +659,7 @@ def test_scan_rar_password_mixed_encrypted_headers_nomatch(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_mixed_encrypted_headers_nocrack(mocker):
@@ -668,7 +668,7 @@ def test_scan_rar_password_mixed_encrypted_headers_nocrack(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["password_protected", "encrypted_filenames"],
         "total": {"files": 0, "extracted": 0},
@@ -692,7 +692,7 @@ def test_scan_rar_password_mixed_encrypted_headers_nocrack(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_encrypted_headers(mocker):
@@ -701,7 +701,7 @@ def test_scan_rar_password_encrypted_headers(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["password_protected", "encrypted_filenames"],
         "total": {"files": 3, "extracted": 3},
@@ -763,7 +763,7 @@ def test_scan_rar_password_encrypted_headers(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_bad_path(mocker):
@@ -772,7 +772,7 @@ def test_scan_rar_password_bad_path(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [
             "password_file_missing",
@@ -837,7 +837,7 @@ def test_scan_rar_password_bad_path(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_password_empty_file(mocker):
@@ -846,7 +846,7 @@ def test_scan_rar_password_empty_file(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [
             "no_passwords_loaded",
@@ -911,7 +911,7 @@ def test_scan_rar_password_empty_file(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_comment_expanded_timestamps(mocker):
@@ -920,7 +920,7 @@ def test_scan_rar_comment_expanded_timestamps(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "comment": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -958,7 +958,7 @@ def test_scan_rar_comment_expanded_timestamps(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_rar_big(mocker):
@@ -967,7 +967,7 @@ def test_scan_rar_big(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["file_size_limit"],
         "total": {"files": 1, "extracted": 0},
@@ -1004,4 +1004,4 @@ def test_scan_rar_big(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

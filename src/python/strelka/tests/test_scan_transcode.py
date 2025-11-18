@@ -16,7 +16,7 @@ def test_scan_transcode_avif(mocker, output_format) -> None:
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
+    test_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -26,7 +26,7 @@ def test_scan_transcode_avif(mocker, output_format) -> None:
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 @pytest.mark.parametrize("output_format", output_formats)
@@ -36,7 +36,7 @@ def test_scan_transcode_heic(mocker, output_format) -> None:
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
+    test_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -46,7 +46,7 @@ def test_scan_transcode_heic(mocker, output_format) -> None:
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 @pytest.mark.parametrize("output_format", output_formats)
@@ -56,7 +56,7 @@ def test_scan_transcode_heif(mocker, output_format) -> None:
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
+    test_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -66,7 +66,7 @@ def test_scan_transcode_heif(mocker, output_format) -> None:
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_transcode_broken_heic(mocker) -> None:
@@ -75,7 +75,7 @@ def test_scan_transcode_broken_heic(mocker) -> None:
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["unidentified_image"]}
+    test_event = {"elapsed": mock.ANY, "flags": ["unidentified_image"]}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -84,7 +84,7 @@ def test_scan_transcode_broken_heic(mocker) -> None:
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 @pytest.mark.parametrize("output_format", output_formats)
@@ -94,7 +94,7 @@ def test_scan_transcode_rgba(mocker, output_format) -> None:
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
+    test_event = {"elapsed": mock.ANY, "flags": ["transcoded"]}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -104,4 +104,4 @@ def test_scan_transcode_rgba(mocker, output_format) -> None:
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

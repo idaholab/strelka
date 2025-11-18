@@ -2,10 +2,10 @@ import os
 
 import requests
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanCuckoo(strelka.Scanner):
+class ScanCuckoo(Scanner):
     """Sends files to Cuckoo sandbox.
 
     Attributes:

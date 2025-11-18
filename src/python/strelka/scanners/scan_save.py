@@ -5,10 +5,10 @@ import bz2
 import gzip
 import lzma
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanSave(strelka.Scanner):
+class ScanSave(Scanner):
     """Compress and encode raw file data"""
 
     def init(self):
@@ -38,8 +38,6 @@ class ScanSave(strelka.Scanner):
 
             try:
                 data = self.compress_data[compression](data)
-            except strelka.ScannerTimeout:
-                raise
             except Exception:
                 self.flags.append("save_compression_error")
                 return
@@ -54,8 +52,6 @@ class ScanSave(strelka.Scanner):
         # Encode the data for JSON compatibility
         try:
             out_data = self.encode_data[encoding](data)
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             self.flags.append("save_encoding_error")
             return

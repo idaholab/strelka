@@ -147,3 +147,7 @@ cython_debug/
 
 # pyenv local version file
 .python-version
+
+# local vim/nvim configuration
+.vimrc
+.nvimrc

@@ -11,7 +11,7 @@ def test_scan_zip(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 4, "extracted": 4},
@@ -59,7 +59,7 @@ def test_scan_zip(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_zip_count_limit(mocker):
@@ -68,7 +68,7 @@ def test_scan_zip_count_limit(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["file_count_limit"],
         "total": {"files": 4, "extracted": 2},
@@ -101,7 +101,7 @@ def test_scan_zip_count_limit(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_zip_metadata_limit(mocker):
@@ -110,7 +110,7 @@ def test_scan_zip_metadata_limit(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["file_count_limit"],
         "total": {"files": 4, "extracted": 2},
@@ -162,7 +162,7 @@ def test_scan_zip_metadata_limit(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_zip_aes256(mocker):
@@ -171,7 +171,7 @@ def test_scan_zip_aes256(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["encrypted"],
         "total": {"files": 4, "extracted": 4},
@@ -221,7 +221,7 @@ def test_scan_zip_aes256(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_zip_big(mocker):
@@ -230,7 +230,7 @@ def test_scan_zip_big(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["file_size_limit"],
         "total": {"files": 1, "extracted": 0},
@@ -255,7 +255,7 @@ def test_scan_zip_big(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_zip_empty(mocker):
@@ -264,7 +264,7 @@ def test_scan_zip_empty(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 2, "extracted": 1},
@@ -296,7 +296,7 @@ def test_scan_zip_empty(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_zip_mixed_zipcrypto(mocker):
@@ -305,7 +305,7 @@ def test_scan_zip_mixed_zipcrypto(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["encrypted"],
         "total": {"files": 4, "extracted": 3},
@@ -355,7 +355,7 @@ def test_scan_zip_mixed_zipcrypto(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 # test_aes256_password.zip

@@ -1,249 +1,280 @@
-import os
-import pathlib
+import datetime
+from itertools import count
+from pathlib import Path
 import re
-import shutil
 import subprocess
 import tempfile
+from typing import ClassVar
 
-from strelka import strelka
+import inflection
+
+from . import File, Options, Scanner
+from ..model import Date, FileType, Hash
 
 
-class ScanDmg(strelka.Scanner):
+class ScanDmg(Scanner):
     """Extracts files from DMG images"""
 
-    EXCLUDED_ROOT_DIRS = ["[SYSTEM]"]
+    EXCLUDED_ROOT_DIRS: ClassVar = {
+        "[SYSTEM]",
+    }
+    SKIPPED_EXTATTRS: ClassVar = {
+        "com.apple.quarantine",
+        "com.apple.FinderInfo",
+    }
+    FILE_MODE_MAPPING: ClassVar = {
+        "D": "directory",
+        "R": "readonly",
+        "H": "hidden",
+        "S": "system",
+        "A": "archivable",
+    }
+    KEPT_PROPERTIES: ClassVar = {
+        "Label",
+        "Path",
+        "Type",
+        "Created",
+        "Creator Application",
+        "File System",
+    }
 
-    def scan(self, data, file, options, expire_at):
-        file_limit = options.get("limit", 1000)
-        tmp_directory = options.get("tmp_file_directory", "/tmp/")
-        scanner_timeout = options.get("scanner_timeout", 150)
+    REGEX_7ZIP_VERSION: ClassVar = re.compile(
+        # 7-Zip (z) 24.09 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+        r"^7-Zip[^\d]+(\d+\.\d+)",
+    )
+    REGEX_MODE_PROPERTIES: ClassVar = re.compile(
+        # --/----
+        r"^(--|----)$",
+    )
+    REGEX_PROPERTY: ClassVar = re.compile(
+        # Comment =
+        r"^(.+) = (.+)$",
+    )
+    REGEX_MODE_FILES: ClassVar = re.compile(
+        #    Date      Time    Attr         Size   Compressed  Name
+        r"\s+Date\s+Time\s+Attr\s+Size\s+Compressed\s+Name"
+    )
+    REGEX_FILE: ClassVar = re.compile(
+        # 2022-12-05 17:23:59 ....A       100656       102400  lorem.txt
+        r"""
+        (?P<datetime>\d+-\d+-\d+\s\d+:\d+:\d+)\s+
+        (?P<modes>[A-Z.]{5})
+        (?:\s+(?P<size>\d+))?
+        (?:\s+(?P<compressed>\d+))?\s+
+        (?P<name>.+)
+        """,
+        re.VERBOSE,
+    )
 
-        self.event["total"] = {"files": 0, "extracted": 0}
-        self.event["files"] = []
-        # self.event["hidden_dirs"] = []
-        self.event["meta"] = {}
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
+        file_limit = self.evaluate_limit(options.get("limit", -1))
+        hash_all_files = options.get("hash_all_files", True)
+        tmp_dir = options.get("tmp_file_directory", tempfile.gettempdir())
+        sevenzz = self.find_executable("7zz", options.get("7zz"))
 
-        try:
-            self.extract_7zip(
-                data, tmp_directory, scanner_timeout, expire_at, file_limit
-            )
-        except strelka.ScannerTimeout:
-            raise
-        except Exception:
-            self.flags.append("dmg_7zip_extract_error")
-
-    def extract_7zip(self, data, tmp_dir, scanner_timeout, expire_at, file_limit):
-        """Decompress input file to /tmp with 7zz, send files to coordinator"""
+        # initialize our event data
+        self.event.update(
+            {
+                "total": {
+                    "files": 0,
+                    "directories": 0,
+                    "extracted": 0,
+                },
+                "hidden_dirs": [],
+                "meta": {
+                    "partitions": [],
+                },
+            }
+        )
 
         # Check if 7zip package is installed
-        if not shutil.which("7zz"):
-            self.flags.append("dmg_7zip_not_installed_error")
+        if sevenzz is None:
+            self.add_flag("7zip_not_installed_error")
             return
 
-        with tempfile.NamedTemporaryFile(dir=tmp_dir, mode="wb") as tmp_data:
+        # skip the things we want to ignore via 7zz command line flags rather than
+        # extracting/listing everything and filtering, should be more efficient
+        exclusion_cmdline_args = [
+            # exclude any of the given excluded root directories
+            *(f"-xm!{n}/" for n in self.EXCLUDED_ROOT_DIRS),
+            # also skip some of the extended attributes
+            *(f"-xr!*:{e}" for e in self.SKIPPED_EXTATTRS),
+        ]
+
+        with (
+            tempfile.NamedTemporaryFile(dir=tmp_dir, mode="wb") as tmp_data,
+            tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_extract,
+        ):
             tmp_data.write(data)
             tmp_data.flush()
             tmp_data.seek(0)
 
-            if not tmp_data:
-                self.flags.append("dmg_7zip_tmp_error")
-                return
+            indices = {}
 
             try:
-                with tempfile.TemporaryDirectory() as tmp_extract:
-                    try:
-                        (stdout, stderr) = subprocess.Popen(
-                            ["7zz", "x", tmp_data.name, f"-o{tmp_extract}"],
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE,
-                        ).communicate(timeout=scanner_timeout)
-                    except strelka.ScannerTimeout:
-                        raise
-                    except Exception:
-                        self.flags.append("dmg_7zip_extract_process_error")
-
-                    def get_all_items(root, exclude=None):
-                        """Iterates through filesystem paths"""
-                        if exclude is None:
-                            exclude = []
-                        for item in root.iterdir():
-                            if item.name in exclude:
-                                continue
-                            yield item
-                            if item.is_dir():
-                                yield from get_all_items(item)
-
-                    # Iterate over extracted files, except excluded paths
-                    for name in get_all_items(
-                        pathlib.Path(tmp_extract), self.EXCLUDED_ROOT_DIRS
-                    ):
-                        if not name.is_file():
-                            continue
-
-                        # Skip duplicate files created with these extended attributes
-                        if str(name).endswith(":com.apple.quarantine") or str(
-                            name
-                        ).endswith(":com.apple.FinderInfo"):
-                            continue
-
-                        if self.event["total"]["extracted"] >= file_limit:
-                            self.flags.append("dmg_file_limit_error")
-                            break
-
-                        try:
-                            relname = os.path.relpath(name, tmp_extract)
-                            with open(name, "rb") as extracted_file:
-                                # Send extracted file back to Strelka
-                                self.emit_file(extracted_file.read(), name=relname)
-
-                            self.event["total"]["extracted"] += 1
-                        except strelka.ScannerTimeout:
-                            raise
-                        except Exception:
-                            self.flags.append("dmg_file_upload_error")
-            except strelka.ScannerTimeout:
-                raise
-            except Exception:
-                self.flags.append("dmg_7zip_extract_error")
+                result = subprocess.run(
+                    [
+                        sevenzz,
+                        "l",
+                        *exclusion_cmdline_args,
+                        tmp_data.name,
+                    ],
+                    capture_output=True,
+                    encoding="utf-8",
+                    check=True,
+                    timeout=self.scanner_timeout,
+                )
+            except Exception as e:
+                self.add_flag("7zip_list_error", e)
+            else:
+                try:
+                    indices.update(
+                        self.parse_7zip_stdout(result.stdout, file.name, tmp_data.name)
+                    )
+                except Exception as e:
+                    self.add_flag("7zip_list_parse_error", e)
 
             try:
-                (stdout, stderr) = subprocess.Popen(
-                    ["7zz", "l", tmp_data.name],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL,
-                ).communicate(timeout=scanner_timeout)
+                subprocess.run(
+                    [
+                        sevenzz,
+                        "x",
+                        *exclusion_cmdline_args,
+                        f"-o{tmp_extract}",
+                        tmp_data.name,
+                    ],
+                    capture_output=True,
+                    encoding="utf-8",
+                    check=True,
+                    timeout=self.scanner_timeout,
+                )
+            except Exception as e:
+                self.add_flag("7zip_extract_error", e)
 
-                self.parse_7zip_stdout(stdout.decode("utf-8"), file_limit)
-            except strelka.ScannerTimeout:
-                raise
-            except Exception:
-                self.flags.append("dmg_7zip_output_error")
-                return
+            # iterate over the files that we extracted from the listing
+            for index, metadata in indices.values():
+                # figure out the actual path to our file, relative to our extracted root
+                name = Path(tmp_extract) / metadata["path"]
+                child_data = None
 
-    def parse_7zip_stdout(self, output_7zip, file_limit):
-        """Parse 7zz output, create metadata"""
+                # make sure we're not over our file limit; if we are, we will still
+                # output children for those files, but not recurse
+                if name.is_dir():
+                    metadata["type"] = FileType.directory
+                elif name.is_file():
+                    metadata["type"] = FileType.file
+                    if self.event["total"]["extracted"] >= file_limit:
+                        # we won't pass the data along, but we can generate hashes for
+                        # it if we are allowed to, since we already have the data...
+                        if hash_all_files and name.is_file():
+                            metadata["hash"] = Hash.for_data(name.read_bytes())
+                        self.add_flag("file_limit_reached")
+                    # we haven't reached our file limit yet, and this is a file, so we can
+                    # get the file's data for recursing
+                    else:
+                        child_data = name.read_bytes()
+                        self.event["total"]["extracted"] += 1
 
+                # emit a child with our collected data/metadata
+                self.emit_file(
+                    **metadata,
+                    data=child_data,
+                    unique_key=(index,),
+                )
+
+    @staticmethod
+    def parse_7zip_timestamp(ts: str) -> datetime.datetime:
+        if "." in ts:
+            ts = ts[:ts.rindex(".") + 7]
+        else:
+            ts = ts + ".000000"
+        dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S.%f")
+        return dt.astimezone().astimezone(datetime.UTC)
+
+    def parse_7zip_stdout(
+        self,
+        output_7zip: str,
+        archive: str | None,
+        tmp_data: str,
+    ) -> dict[str, int]:
         mode = None
 
-        try:
-            output_lines = output_7zip.splitlines()
+        output_lines = output_7zip.splitlines()
 
-            # 7-Zip (z) 24.09 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
-            regex_7zip_version = re.compile(r"^7-Zip[^\d]+(\d+\.\d+)")
+        partition = {}
+        indices = {}
+        counter = count(1)
 
-            # --/----
-            regex_mode_properties = re.compile(r"^(--|----)$")
+        for output_line in output_lines:
+            if not output_line:
+                continue
 
-            # Comment =
-            regex_property = re.compile(r"^(.+) = (.+)$")
+            # Properties section
+            if match := self.REGEX_MODE_PROPERTIES.match(output_line):
+                if "path" in partition.keys():
+                    if "created" in partition:
+                        partition["created"] = self.parse_7zip_timestamp(partition["created"])
+                    self.event["meta"]["partitions"].append(partition)
+                partition = {}
+                mode = "properties"
 
-            #    Date      Time    Attr         Size   Compressed  Name
-            regex_mode_files = re.compile(
-                r"\s+Date\s+Time\s+Attr\s+Size\s+Compressed\s+Name"
-            )
+            # File section
+            if match := self.REGEX_MODE_FILES.match(output_line):
+                # Wrap up final partition
+                if "path" in partition.keys():
+                    if "created" in partition:
+                        partition["created"] = self.parse_7zip_timestamp(partition["created"])
+                    self.event["meta"]["partitions"].append(partition)
+                partition = {}
+                mode = "files"
 
-            # 2022-12-05 17:23:59 ....A       100656       102400  lorem.txt
-            regex_file = re.compile(
-                r"(?P<datetime>\d+-\d+-\d+\s\d+:\d+:\d+)\s+(?P<modes>[A-Z.]{5})(?:\s+(?P<size>\d+))?(?:\s+(?P<compressed>\d+))?\s+(?P<name>.+)"
-            )
+            # Header section
+            if not mode:
+                if match := self.REGEX_7ZIP_VERSION.match(output_line):
+                    self.event["meta"]["7zip_version"] = match.group(1)
+                    continue
 
-            def parse_file_modes(file_modes):
-                file_mode_list = []
+            elif mode == "properties":
+                # Collect specific properties
+                if match := self.REGEX_PROPERTY.match(output_line):
+                    key, value = match.groups()
+                    if key not in self.KEPT_PROPERTIES:
+                        continue
+                    if archive and value == tmp_data:
+                        value = archive
+                    partition[inflection.underscore(key.replace(" ", ""))] = value
 
-                for file_mode in file_modes:
-                    if file_mode == "D":
-                        file_mode_list.append("directory")
-                    elif file_mode == "R":
-                        file_mode_list.append("readonly")
-                    elif file_mode == "H":
-                        file_mode_list.append("hidden")
-                    elif file_mode == "S":
-                        file_mode_list.append("system")
-                    elif file_mode == "A":
-                        file_mode_list.append("archivable")
+            elif mode == "files":
+                if match := self.REGEX_FILE.match(output_line):
+                    name = Path(match.group("name"))
 
-                return file_mode_list
+                    modes_list = list(
+                        filter(
+                            bool,
+                            map(self.FILE_MODE_MAPPING.get, match.group("modes")),
+                        )
+                    )
 
-            partition = {}
+                    # No DMG sample available has a file property of hidden
+                    # if "hidden" in modes_list and "directory" in modes_list:
+                    #    self.event["hidden_dirs"].append(match.group("name"))
 
-            for output_line in output_lines:
-                if output_line:
-                    # Properties section
-                    match = regex_mode_properties.match(output_line)
-                    if match:
-                        if "path" in partition.keys():
-                            if not self.event.get("meta", {}).get("partitions", []):
-                                self.event["meta"]["partitions"] = []
-                            self.event["meta"]["partitions"].append(partition)
-                        partition = {}
-                        mode = "properties"
+                    metadata = {
+                        "size": int(match.group("size") or 0),
+                        "mtime": self.parse_7zip_timestamp(
+                            match.group("datetime")
+                        ),
+                        "path": str(name),
+                    }
+                    if modes_list:
+                        metadata["attributes"] = set(modes_list)
 
-                    # File section
-                    match = regex_mode_files.match(output_line)
-                    if match:
-                        # Wrap up final partition
-                        if "path" in partition.keys():
-                            if not self.event.get("meta", {}).get("partitions", []):
-                                self.event["meta"]["partitions"] = []
-                            self.event["meta"]["partitions"].append(partition)
-                        partition = {}
-                        mode = "files"
+                    indices[str(name)] = (next(counter), metadata)
 
-                    # Header section
-                    if not mode:
-                        match = regex_7zip_version.match(output_line)
-                        if match:
-                            version = regex_7zip_version.match(output_line).group(1)
-                            self.event["meta"]["7zip_version"] = version
+                    if "directory" in modes_list:
+                        self.event["total"]["directories"] += 1
+                        metadata.pop("size", None)
+                    else:
+                        self.event["total"]["files"] += 1
 
-                            continue
-
-                    elif mode == "properties":
-                        # Collect specific properties
-                        match = regex_property.match(output_line)
-                        if match:
-                            if match.group(1) == "Label":
-                                partition["label"] = match.group(2)
-                            elif match.group(1) == "Path":
-                                partition["path"] = match.group(2)
-                            elif match.group(1) == "Type":
-                                partition["type"] = match.group(2)
-                            elif match.group(1) == "Created":
-                                partition["created"] = match.group(2)
-                            elif match.group(1) == "Creator Application":
-                                partition["creator_application"] = match.group(2)
-                            elif match.group(1) == "File System":
-                                partition["file_system"] = match.group(2)
-
-                    elif mode == "files":
-                        match = regex_file.match(output_line)
-                        if match:
-                            modes_list = parse_file_modes(match.group("modes"))
-
-                            # Skip excluded paths
-                            if (
-                                os.path.normpath(match.group("name")).split(
-                                    os.path.sep
-                                )[0]
-                                in self.EXCLUDED_ROOT_DIRS
-                            ):
-                                continue
-
-                            # No DMG sample available has a file property of hidden
-                            # if "hidden" in modes_list and "directory" in modes_list:
-                            #    self.event["hidden_dirs"].append(match.group("name"))
-
-                            if "directory" not in modes_list:
-                                self.event["total"]["files"] += 1
-                                self.event["files"].append(
-                                    {
-                                        "filename": match.group("name"),
-                                        "size": match.group("size"),
-                                        "datetime": match.group("datetime"),
-                                    }
-                                )
-        except strelka.ScannerTimeout:
-            raise
-        except Exception:
-            self.flags.append("dmg_7zip_parse_error")
-            return
+        return indices

@@ -11,7 +11,7 @@ def test_scan_x509_pem(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "issuer": "C=US, ST=MN, L=Minneapolis, O=Target, CN=target.example.com",
@@ -32,7 +32,7 @@ def test_scan_x509_pem(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_x509_der(mocker):
@@ -41,7 +41,7 @@ def test_scan_x509_der(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "issuer": "C=US, ST=MN, L=Minneapolis, O=Target, CN=target.example.com",
@@ -62,4 +62,4 @@ def test_scan_x509_der(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

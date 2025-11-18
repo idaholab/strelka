@@ -2,10 +2,10 @@ from io import BytesIO
 
 from lxml import etree
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanJnlp(strelka.Scanner):
+class ScanJnlp(Scanner):
     """
     Analyzes Java Network Launch Protocol (JNLP) files.
 

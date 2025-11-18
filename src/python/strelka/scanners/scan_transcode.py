@@ -5,7 +5,7 @@ import pillow_avif
 from PIL import Image, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 
-from strelka import strelka
+from . import Scanner
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
@@ -15,7 +15,7 @@ _ = pillow_avif.AvifImagePlugin
 register_heif_opener()
 
 
-class ScanTranscode(strelka.Scanner):
+class ScanTranscode(Scanner):
     """
     Converts supported images for easier scanning
 

@@ -4,12 +4,12 @@ import logging
 from PIL import Image, ImageOps
 from pyzbar.pyzbar import decode
 
-from strelka import strelka
+from . import Scanner
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
 
-class ScanQr(strelka.Scanner):
+class ScanQr(Scanner):
     """
     Collects QR code metadata from image files.
     """
@@ -41,7 +41,5 @@ class ScanQr(strelka.Scanner):
             if barcode_data:
                 self.event["data"] = barcode_data
 
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             self.flags.append("decode_error")

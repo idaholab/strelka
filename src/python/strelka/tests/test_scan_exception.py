@@ -1,22 +1,66 @@
-from unittest import TestCase, mock
+from strelka.tests import (
+    File,
+    Scanner,
+    fixtures,
+    make_exception,
+    make_event,
+    run_test_scan,
+)
 
-from strelka.scanners.scan_exception import ScanException as ScanUnderTest
-from strelka.tests import run_test_scan
+
+scan_exception = fixtures.scanners.exception
 
 
-def test_scan_exception(mocker):
+class ShouldBeUncaught(BaseException):
+    pass
+
+
+def test_scan_exception(
+    scan_exception: Scanner,
+    empty_file: File,
+) -> None:
     """
-    Pass: Exception should be caught by scan_wrapper(), a flag set, traceback added.
-    Failure: Unable to load file or sample event fails to match, meaning the exception was uncaught.
+    Pass:   The scanner catches the exception, adds a flag, and stores
+            exception/traceback information.
+    Fail:   The exception is uncaught, no flag is added, or no
+            exception/traceback information is present.
     """
+    test_event = make_event(
+        exceptions=[
+            make_exception(
+                "builtins.Exception",
+                message="this exception should be caught",
+                flag="exception:uncaught_exception",
+            ),
+        ],
+    )
+    run_test_scan(
+        scanner=scan_exception,
+        fixture=empty_file,
+        expected=test_event,
+        options={
+            "exception": Exception,
+            "message": "this exception should be caught",
+        },
+    )
 
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": ["uncaught_exception"],
-        "exception": mock.ANY,
-    }
 
-    scanner_event = run_test_scan(mocker=mocker, scan_class=ScanUnderTest)
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+def test_scan_exception_uncaught(
+    scan_exception: Scanner,
+    empty_file: File,
+) -> None:
+    """
+    Pass:   The scanner doesn't catch the exception, which means that
+            BaseException instances (such as ScannerTimeout) isn't caught by the
+            base scanner class/wrapper method.
+    Fail:   The exception is caught.
+    """
+    run_test_scan(
+        scanner=scan_exception,
+        fixture=empty_file,
+        options={
+            "exception": ShouldBeUncaught,
+            "message": "this exception should not be caught",
+        },
+        raises=ShouldBeUncaught,
+    )

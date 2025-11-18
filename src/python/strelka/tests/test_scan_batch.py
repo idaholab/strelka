@@ -1,76 +1,97 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_batch import ScanBatch as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_batch(mocker):
+scan_batch = fixtures.scanners.batch
+data_bat = fixtures.data("test.bat")
+
+
+def test_scan_batch(
+    scan_batch: Scanner,
+    data_bat: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "tokens": [
-            "Token.Punctuation",
-            "Token.Keyword",
-            "Token.Text",
-            "Token.Name.Variable",
-            "Token.Literal.String.Double",
-            "Token.Operator",
-            "Token.Comment.Single",
-            "Token.Name.Label",
-        ],
-        "comments": [
-            "REM Simple batch script for calling avrdude with options for USBtinyISP",
-            "REM (C) 2012, 2013 Michael Bemmerl",
-            "REM License: WTFPL-2.0",
-        ],
-        "keywords": ["echo", "SETLOCAL", "SET", "IF", "NOT", "GOTO"],
-        "labels": ["help", "exit"],
-        "strings": ["avrdude", "\\\\bin\\\\avrdude.exe"],
-        "text": [
-            "off",
-            "\\n",
-            "\\n\\n",
-            "-c",
-            "usbtiny",
-            "-P",
-            "usb",
-            "You",
-            "probably",
-            "want",
-            "to",
-            "add",
-            "at",
-            "least",
-            "the",
-            "part",
-            "option",
-            "-p",
-            "[partno]",
-            ".",
-            "and",
-            "some",
-            "other",
-            "AVRDUDE",
-            "command",
-            "line",
-            "like",
-            "-U",
-            "flash:w:[file]",
-        ],
-        "variables": ["AVRDUDE", "%AVR32_HOME%", "%1", "%AVRDUDE%", "%*"],
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.bat",
+    test_event = make_event(
+        scan={
+            "script_length_bytes": 515,
+            "token_types": [
+                "Token.Comment.Single",
+                "Token.Keyword",
+                "Token.Literal.String.Double",
+                "Token.Name.Label",
+                "Token.Name.Variable",
+                "Token.Operator",
+                "Token.Punctuation",
+                "Token.Text",
+            ],
+            "tokens": {
+                "comments": [
+                    r"REM Simple batch script for calling avrdude "
+                    r"with options for USBtinyISP",
+                    r"REM (C) 2012, 2013 Michael Bemmerl",
+                    r"REM License: WTFPL-2.0",
+                ],
+                "keywords": [
+                    r"echo",
+                    r"SETLOCAL",
+                    r"SET",
+                    r"IF",
+                    r"NOT",
+                    r"GOTO",
+                ],
+                "labels": [
+                    r"help",
+                    r"exit",
+                ],
+                "strings": [
+                    r"avrdude",
+                    r"\\bin\\avrdude.exe",
+                ],
+                "text": [
+                    r"off",
+                    r"\n",
+                    r"\n\n",
+                    r"-c",
+                    r"usbtiny",
+                    r"-P",
+                    r"usb",
+                    r"You",
+                    r"probably",
+                    r"want",
+                    r"to",
+                    r"add",
+                    r"at",
+                    r"least",
+                    r"the",
+                    r"part",
+                    r"option",
+                    r"-p",
+                    r"[partno]",
+                    r".",
+                    r"and",
+                    r"some",
+                    r"other",
+                    r"AVRDUDE",
+                    r"command",
+                    r"line",
+                    r"like",
+                    r"-U",
+                    r"flash:w:[file]",
+                ],
+                "variables": [
+                    r"AVRDUDE",
+                    r"%AVR32_HOME%",
+                    r"%1",
+                    r"%AVRDUDE%",
+                    r"%*",
+                ],
+            },
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_batch,
+        fixture=data_bat,
+        expected=test_event,
+    )

@@ -6,7 +6,7 @@ import tempfile
 
 import msoffcrypto
 
-from strelka import strelka
+from . import Scanner
 
 # Set logging level to INFO to prevent passwords from getting logged
 logging.getLogger("msoffcrypto").setLevel(logging.INFO)
@@ -99,14 +99,12 @@ def crack_word(
                 return ""
         else:
             return stdout.split(b":")[1].split()[0]
-    except strelka.ScannerTimeout:
-        raise
     except Exception as e:
         self.flags.append(str(e))
         return ""
 
 
-class ScanEncryptedDoc(strelka.Scanner):
+class ScanEncryptedDoc(Scanner):
     """Extracts passwords from encrypted office word documents.
 
     Attributes:
@@ -153,8 +151,6 @@ class ScanEncryptedDoc(strelka.Scanner):
                     # Send extracted file back to Strelka
                     self.emit_file(extract_data)
 
-                except strelka.ScannerTimeout:
-                    raise
                 except Exception:
                     self.flags.append(
                         "Could not decrypt document with recovered password"

@@ -1,12 +1,12 @@
 import lief
 from lief import ELF
 
-from strelka import strelka
+from . import Scanner
 
 lief.logging.disable()
 
 
-class ScanElf(strelka.Scanner):
+class ScanElf(Scanner):
     """Collects metadata from ELF files."""
 
     def scan(self, data, file, options, expire_at):
@@ -51,8 +51,6 @@ class ScanElf(strelka.Scanner):
                 "machine": str(elf.header.machine_type).split(".")[1],
                 "size": elf.header.header_size,
             }
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             pass
 
@@ -105,8 +103,6 @@ class ScanElf(strelka.Scanner):
                         ],
                     }
                 )
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             pass
 
@@ -132,8 +128,6 @@ class ScanElf(strelka.Scanner):
                         },
                     }
                 )
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             pass
 

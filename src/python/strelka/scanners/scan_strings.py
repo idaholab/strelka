@@ -1,9 +1,9 @@
 import re
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanStrings(strelka.Scanner):
+class ScanStrings(Scanner):
     """Collects strings from files.
 
     Collects strings from files (similar to the output of the Unix 'strings'

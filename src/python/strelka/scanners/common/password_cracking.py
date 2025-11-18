@@ -4,8 +4,6 @@ import subprocess
 import tempfile
 import time
 
-from strelka import strelka
-
 
 def convert_unit_john(jtr_number: str) -> float:
     if jtr_number.endswith("K"):
@@ -32,8 +30,6 @@ def office2john(data: bytes, tmp_dir: str) -> bytes:
                 stderr=subprocess.PIPE,
             ).communicate()
 
-    except strelka.ScannerTimeout:
-        raise
     except Exception:
         return b""
 
@@ -52,8 +48,6 @@ def zip2john(data: bytes, tmp_dir: str) -> bytes:
                 stderr=subprocess.PIPE,
             ).communicate()
 
-    except strelka.ScannerTimeout:
-        raise
     except Exception:
         return b""
 
@@ -72,8 +66,6 @@ def sevenzip2john(data: bytes, tmp_dir: str) -> bytes:
                 stderr=subprocess.PIPE,
             ).communicate()
 
-    except strelka.ScannerTimeout:
-        raise
     except Exception:
         return b""
 

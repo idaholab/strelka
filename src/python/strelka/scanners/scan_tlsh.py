@@ -6,10 +6,10 @@ import os
 import tlsh
 import yaml
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanTlsh(strelka.Scanner):
+class ScanTlsh(Scanner):
     """Compare file against a list of TLSH values.
     Output from this scanner implies matched file
     has TLSH value lower than defined threshold

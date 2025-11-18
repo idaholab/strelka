@@ -11,7 +11,7 @@ def test_scan_upx(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["upx_packed"]}
+    test_event = {"elapsed": mock.ANY, "flags": ["upx_packed"]}
 
     scanner_event = run_test_scan(
         mocker=mocker,
@@ -20,4 +20,4 @@ def test_scan_upx(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

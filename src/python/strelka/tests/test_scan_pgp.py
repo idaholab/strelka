@@ -11,7 +11,7 @@ def test_scan_pgp_sig_asc(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "public_key_encrypted_session_keys": [],
@@ -49,7 +49,7 @@ def test_scan_pgp_sig_asc(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_pgp_key_public(mocker):
@@ -58,7 +58,7 @@ def test_scan_pgp_key_public(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {
@@ -128,7 +128,7 @@ def test_scan_pgp_key_public(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_pgp_private(mocker):
@@ -137,7 +137,7 @@ def test_scan_pgp_private(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {
@@ -207,7 +207,7 @@ def test_scan_pgp_private(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_pgp_sig(mocker):
@@ -216,7 +216,7 @@ def test_scan_pgp_sig(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {
@@ -254,4 +254,4 @@ def test_scan_pgp_sig(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

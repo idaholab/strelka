@@ -1,7 +1,7 @@
-from strelka import strelka
+from . import Scanner
 
 
-class ScanIni(strelka.Scanner):
+class ScanIni(Scanner):
     """Parses keys from INI files."""
 
     def scan(self, data, file, options, expire_at):

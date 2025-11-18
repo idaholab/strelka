@@ -1,6 +1,6 @@
 import json
 
-from strelka import strelka
+from . import Scanner
 
 
 def flatten(input: list) -> list:
@@ -14,7 +14,7 @@ def flatten(input: list) -> list:
     return input
 
 
-class ScanManifest(strelka.Scanner):
+class ScanManifest(Scanner):
     """Parses browser extension's  manifest.json."""
 
     def scan(self, data, file, options, expire_at):
@@ -37,8 +37,6 @@ class ScanManifest(strelka.Scanner):
                         self.event[key] = flatten(jsondata[key])
                     else:
                         self.event[key] = jsondata[key]
-        except strelka.ScannerTimeout:
-            raise
         except Exception:
             self.flags.append("error parsing manifest")
             return

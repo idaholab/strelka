@@ -4,10 +4,10 @@ import zlib
 
 import pylzma
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanSwf(strelka.Scanner):
+class ScanSwf(Scanner):
     """Decompresses SWF files."""
 
     def scan(self, data, file, options, expire_at):

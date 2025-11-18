@@ -4,88 +4,81 @@ import tempfile
 
 from donut_decryptor.donut_decryptor import DonutDecryptor
 
-from strelka import strelka
+from . import Options, Scanner
+from ..model import Date, File
 
 
-class ScanDonut(strelka.Scanner):
+class ScanDonut(Scanner):
     """Extracts configs and modules from donut payloads"""
 
-    def scan(self, data, file, options, expire_at):
-        tmp_directory = options.get("tmp_directory", "/tmp/")
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
+        tmp_directory = options.get("tmp_directory", tempfile.gettempdir())
 
-        with tempfile.NamedTemporaryFile(dir=tmp_directory, mode="wb") as tmp_data:
+        self.event.update(
+            {
+                "total": {
+                    "donuts": 0,
+                    "files": 0,
+                },
+                "donuts": [],
+            }
+        )
+
+        with (
+            tempfile.NamedTemporaryFile(dir=tmp_directory, mode="wb") as tmp_data,
+            tempfile.TemporaryDirectory(dir=tmp_directory) as extract_dir,
+        ):
             tmp_data.write(data)
             tmp_data.flush()
             tmp_data.seek(0)
 
             try:
                 donuts = DonutDecryptor.find_donuts(tmp_data.name)
-            except Exception:
+            except Exception as e:
                 # Set output flag on error
-                self.flags.append("donut_decrypt_find_exception")
+                self.add_flag("donut_decrypt_find_exception", e)
+                return
 
-            self.event["total"] = {"donuts": len(donuts), "files": 0}
-
-            self.event["donuts"] = []
+            self.event["total"]["donuts"] = len(donuts)
 
             for donut in donuts:
-                donut_data = {}
-                donut_data["instance_version"] = donut.instance_version
-                donut_data["loader_version"] = donut.loader_version
-                donut_data["offset_loader_start"] = donut.offset_loader_start
-                donut_data["offsets"] = {}
-                donut_data["offsets"]["size_instance"] = donut.offsets.get(
-                    "size_instance"
-                )
-                donut_data["offsets"]["encryption_start"] = donut.offsets.get(
-                    "encryption_start"
-                )
-
-                self.event["donuts"].append(donut_data)
+                info = {
+                    "instance_version": donut.instance_version,
+                    "loader_version": donut.loader_version,
+                    "offset_loader_start": donut.offset_loader_start,
+                    "offsets": {
+                        "size_instance": donut.offsets.get("size_instance"),
+                        "encryption_start": donut.offsets.get("encryption_start"),
+                    },
+                }
 
                 try:
-                    with tempfile.TemporaryDirectory() as tmpdirname:
-                        donut.parse(tmpdirname)
+                    donut.parse(extract_dir)
+                    base = os.path.basename(tmp_data.name)
+                    mod_name = f"mod_{base}"
+                    inst_name = f"inst_{base}"
 
-                        # Retrieve module file
-                        with open(
-                            os.path.join(
-                                tmpdirname, f"mod_{os.path.basename(tmp_data.name)}"
-                            ),
-                            "rb",
-                        ) as mod_file:
-                            # Send extracted file back to Strelka
-                            self.emit_file(mod_file.read())
-                            self.event["total"]["files"] += 1
+                    # Retrieve module file
+                    with open(os.path.join(extract_dir, mod_name), "rb") as mod_file:
+                        # send contents to Strelka for processing
+                        self.emit_file(
+                            mod_file.read(),
+                            name=f":donut-{donut.offset_loader_start}",
+                            unique_key=(donut.offset_loader_start,),
+                        )
+                        self.event["total"]["files"] += 1
 
-                        # Retrieve instance metadata file
-                        with open(
-                            os.path.join(
-                                tmpdirname, f"inst_{os.path.basename(tmp_data.name)}"
-                            ),
-                            "rb",
-                        ) as inst_file:
-                            inst_json = json.load(inst_file)
+                    # Retrieve instance metadata file
+                    with open(os.path.join(extract_dir, inst_name), "rb") as inst_file:
+                        info.update(
+                            {
+                                self.normalize_key(k): v
+                                for k, v in json.load(inst_file).items()
+                                if k not in {"File"}
+                            }
+                        )
 
-                            # Remove unneeded File key
-                            inst_json.pop("File", None)
+                except Exception as e:
+                    self.add_flag("donut_decrypt_parse_exception", e)
 
-                            def change_dict_key(
-                                d, old_key, new_key, default_value=None
-                            ):
-                                d[new_key] = d.pop(old_key, default_value)
-
-                            # Reformat the dictionary keys to be consistent
-                            for key in inst_json:
-                                change_dict_key(
-                                    inst_json, key, key.lower().replace(" ", "_")
-                                )
-
-                            # Update the current donut output
-                            self.event["donuts"][len(self.event["donuts"]) - 1].update(
-                                inst_json
-                            )
-
-                except Exception:
-                    # Set output flag on error
-                    self.flags.append("donut_decrypt_parse_exception")
+                self.event["donuts"].append(info)

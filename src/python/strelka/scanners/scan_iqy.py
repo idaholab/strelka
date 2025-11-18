@@ -1,14 +1,17 @@
-import re
+from __future__ import annotations
 
-from strelka import strelka
+from . import Options, Scanner
+from ..auxiliary import indicators
+from ..model import Date, File
 
 
-class ScanIqy(strelka.Scanner):
+class ScanIqy(Scanner):
     """
-    Strelka scanner for extracting URLs from IQY (Excel Web Query Internet Inquire) files.
+    Scanner for extracting URLs from IQY (Excel Web Query Internet Inquire) files.
 
-    IQY files are typically used to import data into Excel from the web. They often contain URLs
-    that specify the data source. This scanner aims to extract these URLs and process them for IOCs.
+    IQY files are typically used to import data into Excel from the web. They often
+    contain URLs that specify the data source. This scanner aims to extract these URLs
+    and process them for IOCs.
 
     The following is a typical format of an IQY file:
     WEB
@@ -16,51 +19,46 @@ class ScanIqy(strelka.Scanner):
     [URL]
     [optional parameters]
 
-    Reference for IQY file format: https://learn.microsoft.com/en-us/office/vba/api/excel.querytable
+    Reference for IQY file format:
+        https://learn.microsoft.com/en-us/office/vba/api/excel.querytable
     """
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         """
         Processes the provided IQY data to extract URLs.
 
-        Attempts to decode the data and applies a regex pattern to identify and extract URLs.
-        Extracted URLs are added to the scanner's IOC list.
+        Attempts to decode the data and applies a regex pattern to identify and extract
+        URLs. Extracted URLs are added to the scanner's indicators list.
 
         Args:
             data (bytes): Data associated with the IQY file to be scanned.
-            file (strelka.File): File object associated with the data.
-            options (dict): Options to be applied during the scan.
-            expire_at (int): Expiration timestamp for extracted files.
+            file (File): File object associated with the data.
+            options (Options): Options to be applied during the scan.
+            expire_at (Date): Expiration timestamp for extracted files.
         """
+        self.event.update(
+            {
+                "address_found": False,
+            }
+        )
+
+        # Attempt to decode the data
         try:
-            # Compile regex pattern for URL detection
-            address_pattern = re.compile(
-                r"\b(?:http|https|ftp|ftps|file|smb)://\S+|"
-                r"\\{2}\w+\\(?:[\w$]+\\)*[\w$]+",
-                re.IGNORECASE,
-            )
-
-            # Attempt to decode the data
+            decoded_data = data.decode("utf-8")
+        except UnicodeDecodeError:
             try:
-                decoded_data = data.decode("utf-8")
-            except UnicodeDecodeError:
                 decoded_data = data.decode("latin-1")
+            except UnicodeDecodeError:
+                decoded_data = data.decode("ascii")
 
-            # Extract addresses from the data
-            addresses = set(
-                match.group().strip()
-                for line in decoded_data.splitlines()
-                if (match := address_pattern.search(line))
-            )
+        # Extract addresses from the data
+        addresses = set(
+            match.group(0)
+            for line in decoded_data.splitlines()
+            if (match := indicators.url.search(line))
+        )
 
-            # Add extracted URLs to the scanner's IOC list
-            if addresses:
-                self.event["address_found"] = True
-                self.add_iocs(list(addresses))
-            else:
-                self.event["address_found"] = False
-
-        except UnicodeDecodeError as e:
-            self.flags.append(f"Unicode decoding error: {e}")
-        except Exception as e:
-            self.flags.append(f"Unexpected exception: {e}")
+        # Add extracted URLs to the scanner's IOC list
+        if addresses:
+            self.event["address_found"] = True
+            self.add_related(addresses)

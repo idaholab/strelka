@@ -2,11 +2,10 @@ import base64
 import binascii
 import datetime
 import hashlib
-
-# Disable Signifiy Debugging Logging
+from io import BytesIO
 import logging
 import struct
-from io import BytesIO
+from typing import Any
 
 import pefile
 from signify.authenticode import SignedPEFile
@@ -20,7 +19,8 @@ from signify.exceptions import (
     VerificationError,
 )
 
-from strelka import strelka
+from . import Options, Scanner
+from ..model import Date, File
 
 logger = logging.getLogger("signify")
 logger.propagate = False
@@ -244,179 +244,31 @@ COMMON_FILE_INFO_NAMES = {
 }
 
 
-def parse_rich(pe):
-    try:
-        if rich_data := pe.parse_rich_header():
-            rich_dict = {
-                "key": rich_data["key"].hex(),
-                "clear_data": {
-                    "data": base64.b64encode(rich_data["clear_data"]),
-                    "md5": hashlib.md5(rich_data["clear_data"]).hexdigest(),
-                },
-                "raw_data": {
-                    "data": base64.b64encode(rich_data["raw_data"]),
-                    "md5": hashlib.md5(rich_data["raw_data"]).hexdigest(),
-                },
-            }
-
-            values = rich_data["values"]
-            rich_dict.update({"info": []})
-            for i in range(0, len(values), 2):
-                rich_dict["info"].append(
-                    {
-                        "toolid": values[i] >> 16,
-                        "version": values[i] & 0xFFFF,
-                        "count": values[i + 1],
-                    }
-                )
-
-            return rich_dict
-    except pefile.PEFormatError:
-        logging.error("pe_format_error")
-        return
-
-
-def parse_certificates(data):
-    # set up string io as we get data
-    buffer = BytesIO()
-    buffer.write(data)
-    buffer.seek(0)
-
-    try:
-        pe = SignedPEFile(buffer)
-        try:
-            signed_datas = list(pe.signed_datas)
-        except strelka.ScannerTimeout:
-            raise
-        except Exception:
-            return "no_certs_found"
-    except (
-        SignedPEParseError,
-        SignerInfoParseError,
-        AuthenticodeParseError,
-        VerificationError,
-        CertificateVerificationError,
-        SignerInfoVerificationError,
-        AuthenticodeVerificationError,
-    ):
-        return "pe_certificate_error"
-
-    cert_list = []
-    signer_list = []
-    counter_signer_list = []
-    for signed_data in signed_datas:
-        try:
-            certs = signed_data.certificates
-            for cert in certs:
-                asn1 = cert.to_asn1crypto
-                issuer = asn1.issuer.native
-                try:
-                    cert_dict = {
-                        "country_name": issuer.get("country_name"),
-                        "organization_name": issuer.get("organization_name"),
-                        "organizational_unit_name": issuer.get(
-                            "organizational_unit_name"
-                        ),
-                        "common_name": issuer.get("common_name"),
-                        "serial_number": str(cert.serial_number),
-                        "issuer_dn": cert.issuer.dn,
-                        "subject_dn": cert.subject.dn,
-                        "valid_from": cert.valid_from.isoformat(),
-                        "valid_to": cert.valid_to.isoformat(),
-                        "signature_algorithim": str(
-                            cert.signature_algorithm["algorithm"]
-                        ),
-                    }
-                    cert_list.append(cert_dict)
-                except strelka.ScannerTimeout:
-                    raise
-                except Exception:
-                    return "exception parsing certificate exception"
-
-            signer_dict = {
-                "issuer_dn": signed_data.signer_info.issuer.dn,
-                "serial_number": str(signed_data.signer_info.serial_number),
-                "program_name": signed_data.signer_info.program_name,
-                "more_info": signed_data.signer_info.more_info,
-            }
-            # signer information
-            signer_list.append(signer_dict)
-
-            if signed_data.signer_info.countersigner:
-                if hasattr(signed_data.signer_info.countersigner, "issuer"):
-                    counter_signer_issuer_dn = (
-                        signed_data.signer_info.countersigner.issuer.dn
-                    )
-                else:
-                    counter_signer_issuer_dn = (
-                        signed_data.signer_info.countersigner.signer_info.issuer.dn
-                    )
-
-                if hasattr(signed_data.signer_info.countersigner, "serial_number"):
-                    counter_signer_sn = (
-                        signed_data.signer_info.countersigner.serial_number
-                    )
-                else:
-                    counter_signer_sn = (
-                        signed_data.signer_info.countersigner.signer_info.serial_number
-                    )
-                counter_signer_dict = {
-                    "issuer_dn": counter_signer_issuer_dn,
-                    "serial_number": str(counter_signer_sn),
-                    "signing_time": signed_data.signer_info.countersigner.signing_time.isoformat(),
-                }
-                counter_signer_list.append(counter_signer_dict)
-
-        except SignedPEParseError:
-            return "no certificate in signed data"
-
-    security_dict = {
-        "certificates": cert_list,
-        "signers": signer_list,
-        "counter_signers": counter_signer_list,
-    }
-
-    try:
-        pe.verify()
-        security_dict["verification"] = True
-    except strelka.ScannerTimeout:
-        raise
-    except Exception as e:
-        security_dict["verification"] = False
-        security_dict["verification_error"] = str(e)
-
-    return security_dict
-
-
-class ScanPe(strelka.Scanner):
+class ScanPe(Scanner):
     """Collects metadata from PE files."""
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         extract_overlay = options.get("extract_overlay", False)
 
         try:
             pe = pefile.PE(data=data)
             if not pe:
-                self.flags.append("pe_load_error")
+                self.add_flag("pe_load_error")
                 return
         except pefile.PEFormatError:
-            self.flags.append("pe_format_error")
+            self.add_flag("pe_format_error")
             return
         except AttributeError:
-            self.flags.append("pe_attribute_error")
+            self.add_flag("pe_attribute_error")
             return
 
-        if rich_dict := parse_rich(pe):
-            if type(rich_dict) is not str:
+        if rich_dict := self.parse_rich(pe):
+            if rich_dict is not None:
                 self.event["rich"] = rich_dict
-            else:
-                self.flags.append(rich_dict)
 
-        if cert_dict := parse_certificates(data):
-            if type(cert_dict) is not str:
+        if cert_dict := self.parse_certificates(data):
+            if cert_dict is not None:
                 self.event["security"] = cert_dict
-            else:
-                self.flags.append(cert_dict)
 
         self.event["total"] = {
             "libraries": 0,
@@ -430,19 +282,23 @@ class ScanPe(strelka.Scanner):
 
         if offset and len(data[offset:]) > 0:
             self.event["overlay"] = {"size": len(data[offset:]), "extracted": False}
-            self.flags.append("overlay")
+            self.add_flag("overlay")
 
             if extract_overlay:
                 # Send extracted file back to Strelka
-                self.emit_file(data[offset:], name="pe_overlay")
+                self.emit_file(
+                    data[offset:],
+                    name=":pe_overlay",
+                    unique_key=("overlay", offset),
+                )
                 self.event["overlay"].update({"extracted": True})
 
-        if hasattr(pe, "DIRECTORY_ENTRY_DEBUG"):
-            for d in pe.DIRECTORY_ENTRY_DEBUG:
+        if directory_entry_debug := getattr(pe, "DIRECTORY_ENTRY_DEBUG", None):
+            for d in directory_entry_debug:
                 try:
-                    data = pe.get_data(d.struct.AddressOfRawData, d.struct.SizeOfData)
-                    if data.find(b"RSDS") != -1 and len(data) > 24:
-                        pdb = data[data.find(b"RSDS") :]
+                    dbg = pe.get_data(d.struct.AddressOfRawData, d.struct.SizeOfData)
+                    if dbg.find(b"RSDS") != -1 and len(dbg) > 24:
+                        pdb = dbg[dbg.find(b"RSDS") :]
                         self.event["debug"] = {
                             "type": "rsds",
                             "guid": b"%s-%s-%s-%s"
@@ -455,8 +311,8 @@ class ScanPe(strelka.Scanner):
                             "age": struct.unpack("<L", pdb[20:24])[0],
                             "pdb": pdb[24:].split(b"\x00")[0],
                         }
-                    elif data.find(b"NB10") != -1 and len(data) > 16:
-                        pdb = data[data.find(b"NB10") + 8 :]
+                    elif dbg.find(b"NB10") != -1 and len(dbg) > 16:
+                        pdb = dbg[dbg.find(b"NB10") + 8 :]
                         self.event["debug"] = {
                             "type": "nb10",
                             "created": struct.unpack("<L", pdb[0:4])[0],
@@ -464,7 +320,7 @@ class ScanPe(strelka.Scanner):
                             "pdb": pdb[8:].split(b"\x00")[0],
                         }
                 except pefile.PEFormatError:
-                    self.flags.append("corrupt_debug_header")
+                    self.add_flag("corrupt_debug_header")
 
         self.event["file_info"] = {
             "fixed": {},
@@ -530,78 +386,103 @@ class ScanPe(strelka.Scanner):
 
         self.event["header"] = {
             "machine": {
-                "id": pe.FILE_HEADER.Machine,
-                "type": pefile.MACHINE_TYPE.get(pe.FILE_HEADER.Machine, "").replace(
+                "id": (mach := getattr(pe.FILE_HEADER, "Machine", None)),
+                "type": pefile.MACHINE_TYPE.get(mach, "").replace(
                     "IMAGE_FILE_MACHINE_", ""
                 ),
             },
             "magic": {
-                "dos": MAGIC_DOS.get(pe.DOS_HEADER.e_magic, ""),
-                "image": MAGIC_IMAGE.get(pe.OPTIONAL_HEADER.Magic, ""),
+                "dos": MAGIC_DOS.get(getattr(pe.DOS_HEADER, "e_magic"), ""),
+                "image": MAGIC_IMAGE.get(getattr(pe.OPTIONAL_HEADER, "Magic"), ""),
             },
             "subsystem": pefile.SUBSYSTEM_TYPE.get(
-                pe.OPTIONAL_HEADER.Subsystem, ""
+                getattr(pe.OPTIONAL_HEADER, "Subsystem"), ""
             ).replace("IMAGE_SUBSYSTEM_", ""),
         }
 
-        self.event["base_of_code"] = pe.OPTIONAL_HEADER.BaseOfCode
-        self.event["address_of_entry_point"] = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-        self.event["image_base"] = pe.OPTIONAL_HEADER.ImageBase
-        self.event["size_of_code"] = pe.OPTIONAL_HEADER.SizeOfCode
-        self.event["size_of_initialized_data"] = (
-            pe.OPTIONAL_HEADER.SizeOfInitializedData
+        self.event["base_of_code"] = getattr(pe.OPTIONAL_HEADER, "BaseOfCode")
+        self.event["address_of_entry_point"] = getattr(
+            pe.OPTIONAL_HEADER, "AddressOfEntryPoint"
         )
-        self.event["size_of_headers"] = pe.OPTIONAL_HEADER.SizeOfHeaders
-        self.event["size_of_heap_reserve"] = pe.OPTIONAL_HEADER.SizeOfHeapReserve
-        self.event["size_of_image"] = pe.OPTIONAL_HEADER.SizeOfImage
-        self.event["size_of_stack_commit"] = pe.OPTIONAL_HEADER.SizeOfStackCommit
-        self.event["size_of_stack_reserve"] = pe.OPTIONAL_HEADER.SizeOfStackReserve
-        self.event["size_of_heap_commit"] = pe.OPTIONAL_HEADER.SizeOfHeapCommit
-        self.event["size_of_uninitialized_data"] = (
-            pe.OPTIONAL_HEADER.SizeOfUninitializedData
+        self.event["image_base"] = getattr(pe.OPTIONAL_HEADER, "ImageBase")
+        self.event["size_of_code"] = getattr(pe.OPTIONAL_HEADER, "SizeOfCode")
+        self.event["size_of_initialized_data"] = getattr(
+            pe.OPTIONAL_HEADER, "SizeOfInitializedData"
         )
-        self.event["file_alignment"] = pe.OPTIONAL_HEADER.FileAlignment
-        self.event["section_alignment"] = pe.OPTIONAL_HEADER.SectionAlignment
-        self.event["checksum"] = pe.OPTIONAL_HEADER.CheckSum
+        self.event["size_of_headers"] = getattr(pe.OPTIONAL_HEADER, "SizeOfHeaders")
+        self.event["size_of_heap_reserve"] = getattr(
+            pe.OPTIONAL_HEADER, "SizeOfHeapReserve"
+        )
+        self.event["size_of_image"] = getattr(pe.OPTIONAL_HEADER, "SizeOfImage")
+        self.event["size_of_stack_commit"] = getattr(
+            pe.OPTIONAL_HEADER, "SizeOfStackCommit"
+        )
+        self.event["size_of_stack_reserve"] = getattr(
+            pe.OPTIONAL_HEADER, "SizeOfStackReserve"
+        )
+        self.event["size_of_heap_commit"] = getattr(
+            pe.OPTIONAL_HEADER, "SizeOfHeapCommit"
+        )
+        self.event["size_of_uninitialized_data"] = getattr(
+            pe.OPTIONAL_HEADER, "SizeOfUninitializedData"
+        )
+        self.event["file_alignment"] = getattr(pe.OPTIONAL_HEADER, "FileAlignment")
+        self.event["section_alignment"] = getattr(
+            pe.OPTIONAL_HEADER, "SectionAlignment"
+        )
+        self.event["checksum"] = getattr(pe.OPTIONAL_HEADER, "CheckSum")
 
-        self.event["major_image_version"] = pe.OPTIONAL_HEADER.MajorImageVersion
-        self.event["minor_image_version"] = pe.OPTIONAL_HEADER.MinorImageVersion
-        self.event["major_linker_version"] = pe.OPTIONAL_HEADER.MajorLinkerVersion
-        self.event["minor_linker_version"] = pe.OPTIONAL_HEADER.MinorLinkerVersion
-        self.event["major_operating_system_version"] = (
-            pe.OPTIONAL_HEADER.MajorOperatingSystemVersion
+        self.event["major_image_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MajorImageVersion"
         )
-        self.event["minor_operating_system_version"] = (
-            pe.OPTIONAL_HEADER.MinorOperatingSystemVersion
+        self.event["minor_image_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MinorImageVersion"
         )
-        self.event["major_subsystem_version"] = pe.OPTIONAL_HEADER.MajorSubsystemVersion
-        self.event["minor_subsystem_version"] = pe.OPTIONAL_HEADER.MinorSubsystemVersion
+        self.event["major_linker_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MajorLinkerVersion"
+        )
+        self.event["minor_linker_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MinorLinkerVersion"
+        )
+        self.event["major_operating_system_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MajorOperatingSystemVersion"
+        )
+        self.event["minor_operating_system_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MinorOperatingSystemVersion"
+        )
+        self.event["major_subsystem_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MajorSubsystemVersion"
+        )
+        self.event["minor_subsystem_version"] = getattr(
+            pe.OPTIONAL_HEADER, "MinorSubsystemVersion"
+        )
         self.event["image_version"] = float(
-            f"{pe.OPTIONAL_HEADER.MajorImageVersion}.{pe.OPTIONAL_HEADER.MinorImageVersion}"
+            f"{getattr(pe.OPTIONAL_HEADER, 'MajorImageVersion')}.{getattr(pe.OPTIONAL_HEADER, 'MinorImageVersion')}"
         )
         self.event["linker_version"] = float(
-            f"{pe.OPTIONAL_HEADER.MajorLinkerVersion}.{pe.OPTIONAL_HEADER.MinorLinkerVersion}"
+            f"{getattr(pe.OPTIONAL_HEADER, 'MajorLinkerVersion')}.{getattr(pe.OPTIONAL_HEADER, 'MinorLinkerVersion')}"
         )
         self.event["operating_system_version"] = float(
-            f"{pe.OPTIONAL_HEADER.MajorOperatingSystemVersion}.{pe.OPTIONAL_HEADER.MinorOperatingSystemVersion}"
+            f"{getattr(pe.OPTIONAL_HEADER, 'MajorOperatingSystemVersion')}.{getattr(pe.OPTIONAL_HEADER, 'MinorOperatingSystemVersion')}"
         )
         self.event["subsystem_version"] = float(
-            f"{pe.OPTIONAL_HEADER.MajorSubsystemVersion}.{pe.OPTIONAL_HEADER.MinorSubsystemVersion}"
+            f"{getattr(pe.OPTIONAL_HEADER, 'MajorSubsystemVersion')}.{getattr(pe.OPTIONAL_HEADER, 'MinorSubsystemVersion')}"
         )
 
         try:
-            self.event["compile_time"] = datetime.datetime.utcfromtimestamp(
-                pe.FILE_HEADER.TimeDateStamp
+            self.event["compile_time"] = datetime.datetime.fromtimestamp(
+                getattr(pe.FILE_HEADER, "TimeDateStamp"),
+                datetime.UTC,
             ).isoformat()
         except OverflowError:
-            self.flags.append("invalid compile time caused an overflow error")
+            self.add_flag("compile_time_value_overflow")
 
         if hasattr(pe.OPTIONAL_HEADER, "BaseOfData"):
-            self.event["base_of_data"] = pe.OPTIONAL_HEADER.BaseOfData
+            self.event["base_of_data"] = getattr(pe.OPTIONAL_HEADER, "BaseOfData")
 
         dll_characteristics = []
         for o in CHARACTERISTICS_DLL:
-            if pe.OPTIONAL_HEADER.DllCharacteristics & o:
+            if getattr(pe.OPTIONAL_HEADER, "DllCharacteristics") & o:
                 dll_characteristics.append(CHARACTERISTICS_DLL[o])
 
         if dll_characteristics:
@@ -609,7 +490,7 @@ class ScanPe(strelka.Scanner):
 
         image_characteristics = []
         for o in CHARACTERISTICS_IMAGE:
-            if pe.FILE_HEADER.Characteristics & o:
+            if getattr(pe.FILE_HEADER, "Characteristics") & o:
                 image_characteristics.append(CHARACTERISTICS_IMAGE[o])
 
         if image_characteristics:
@@ -621,7 +502,9 @@ class ScanPe(strelka.Scanner):
             resource_sha1_set = set()
             resource_sha256_set = set()
 
-            for res0 in pe.DIRECTORY_ENTRY_RESOURCE.entries:
+            for res0 in getattr(
+                getattr(pe, "DIRECTORY_ENTRY_RESOURCE", None), "entries", ()
+            ):
                 if hasattr(res0, "directory"):
                     for res1 in res0.directory.entries:
                         if hasattr(res1, "directory"):
@@ -630,15 +513,15 @@ class ScanPe(strelka.Scanner):
                                 sub = res2.data.sublang
                                 sub = pefile.get_sublang_name_for_lang(lang, sub)
                                 try:
-                                    data = pe.get_data(
+                                    resdata = pe.get_data(
                                         res2.data.struct.OffsetToData,
                                         res2.data.struct.Size,
                                     )
                                 except pefile.PEFormatError:
                                     continue
-                                resource_md5 = hashlib.md5(data).hexdigest()
-                                resource_sha1 = hashlib.sha1(data).hexdigest()
-                                resource_sha256 = hashlib.sha256(data).hexdigest()
+                                resource_md5 = hashlib.md5(resdata).hexdigest()
+                                resource_sha1 = hashlib.sha1(resdata).hexdigest()
+                                resource_sha256 = hashlib.sha256(resdata).hexdigest()
 
                                 resource_md5_set.add(resource_md5)
                                 resource_sha1_set.add(resource_sha1)
@@ -667,13 +550,14 @@ class ScanPe(strelka.Scanner):
 
                         # TODO: Add optional resource extraction
 
-            self.event["summary"]["resource_md5"] = list(resource_md5_set)
-            self.event["summary"]["resource_sha1"] = list(resource_sha1_set)
-            self.event["summary"]["resource_sha256"] = list(resource_sha256_set)
+            self.event["summary"]["resource_md5"] = resource_md5_set
+            self.event["summary"]["resource_sha1"] = resource_sha1_set
+            self.event["summary"]["resource_sha256"] = resource_sha256_set
 
         self.event["total"]["resources"] = len(self.event["resources"])
 
         self.event["sections"] = []
+        section_name_set = set()
         section_md5_set = set()
         section_sha1_set = set()
         section_sha256_set = set()
@@ -685,6 +569,7 @@ class ScanPe(strelka.Scanner):
                 section_sha1 = sec.get_hash_sha1()
                 section_sha256 = sec.get_hash_sha256()
 
+                section_name_set.add(name)
                 section_md5_set.add(section_md5)
                 section_sha1_set.add(section_sha1)
                 section_sha256_set.add(section_sha256)
@@ -709,13 +594,12 @@ class ScanPe(strelka.Scanner):
                 # TODO: Add optional resource extraction
 
                 self.event["sections"].append(row)
-                self.event["summary"]["section_md5"] = list(section_md5_set)
-                self.event["summary"]["section_sha1"] = list(section_sha1_set)
-                self.event["summary"]["section_sha256"] = list(section_sha256_set)
-            except strelka.ScannerTimeout:
-                raise
-            except Exception as e:
-                self.flags.append(f"exception thrown when parsing section's {e}")
+                self.event["summary"]["section_names"] = section_name_set
+                self.event["summary"]["section_md5"] = section_md5_set
+                self.event["summary"]["section_sha1"] = section_sha1_set
+                self.event["summary"]["section_sha256"] = section_sha256_set
+            except Exception:
+                self.add_flag("section_parse_error")
 
         self.event["symbols"] = {
             "exported": [],
@@ -727,7 +611,7 @@ class ScanPe(strelka.Scanner):
         if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
             self.event["imphash"] = pe.get_imphash()
 
-            for imp in pe.DIRECTORY_ENTRY_IMPORT:
+            for imp in getattr(pe, "DIRECTORY_ENTRY_IMPORT", ()):
                 lib = imp.dll.decode()
                 if lib not in self.event["symbols"]["libraries"]:
                     self.event["symbols"]["libraries"].append(lib)
@@ -747,8 +631,12 @@ class ScanPe(strelka.Scanner):
                 self.event["symbols"]["table"].append(row)
 
         if hasattr(pe, "DIRECTORY_ENTRY_EXPORT"):
-            self.event["dll_name"] = pe.DIRECTORY_ENTRY_EXPORT.name
-            for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
+            self.event["dll_name"] = getattr(
+                getattr(pe, "DIRECTORY_ENTRY_EXPORT", None), "name"
+            )
+            for exp in getattr(
+                getattr(pe, "DIRECTORY_ENTRY_EXPORT", None), "symbols", ()
+            ):
                 if not exp.name:
                     name = f"ord{exp.ordinal}"
                 else:
@@ -766,3 +654,143 @@ class ScanPe(strelka.Scanner):
         self.event["total"]["symbols"] = len(self.event["symbols"]["table"])
 
         # TODO: Add optional resource extraction
+
+    def parse_rich(self, pe) -> dict[str, Any] | None:
+        try:
+            if rich_data := pe.parse_rich_header():
+                rich_dict = {
+                    "key": rich_data["key"].hex(),
+                    "clear_data": {
+                        "data": base64.b64encode(rich_data["clear_data"]),
+                        "md5": hashlib.md5(rich_data["clear_data"]).hexdigest(),
+                    },
+                    "raw_data": {
+                        "data": base64.b64encode(rich_data["raw_data"]),
+                        "md5": hashlib.md5(rich_data["raw_data"]).hexdigest(),
+                    },
+                }
+
+                values = rich_data["values"]
+                rich_dict.update({"info": []})
+                for i in range(0, len(values), 2):
+                    rich_dict["info"].append(
+                        {
+                            "toolid": values[i] >> 16,
+                            "version": values[i] & 0xFFFF,
+                            "count": values[i + 1],
+                        }
+                    )
+
+                return rich_dict
+        except pefile.PEFormatError:
+            self.add_flag("format_error")
+            return
+
+    def parse_certificates(self, data) -> dict[str, Any] | None:
+        # set up string io as we get data
+        buffer = BytesIO()
+        buffer.write(data)
+        buffer.seek(0)
+
+        try:
+            pe = SignedPEFile(buffer)
+            try:
+                signed_datas = list(pe.signed_datas)
+            except Exception:
+                self.add_flag("no_certs_found", None)
+                return
+        except (
+            SignedPEParseError,
+            SignerInfoParseError,
+            AuthenticodeParseError,
+            VerificationError,
+            CertificateVerificationError,
+            SignerInfoVerificationError,
+            AuthenticodeVerificationError,
+        ):
+            self.add_flag("cert_error")
+            return
+
+        cert_list = []
+        signer_list = []
+        counter_signer_list = []
+        for signed_data in signed_datas:
+            try:
+                certs = signed_data.certificates
+                for cert in certs:
+                    asn1 = cert.to_asn1crypto
+                    issuer = asn1.issuer.native
+                    try:
+                        cert_dict = {
+                            "country_name": issuer.get("country_name"),
+                            "organization_name": issuer.get("organization_name"),
+                            "organizational_unit_name": issuer.get(
+                                "organizational_unit_name"
+                            ),
+                            "common_name": issuer.get("common_name"),
+                            "serial_number": str(cert.serial_number),
+                            "issuer_dn": cert.issuer.dn,
+                            "subject_dn": cert.subject.dn,
+                            "valid_from": cert.valid_from.isoformat(),
+                            "valid_to": cert.valid_to.isoformat(),
+                            "signature_algorithim": str(
+                                cert.signature_algorithm["algorithm"]
+                            ),
+                        }
+                        cert_list.append(cert_dict)
+                    except Exception:
+                        self.add_flag("cert_parse_error")
+                        return
+
+                signer_dict = {
+                    "issuer_dn": signed_data.signer_info.issuer.dn,
+                    "serial_number": str(signed_data.signer_info.serial_number),
+                    "program_name": signed_data.signer_info.program_name,
+                    "more_info": signed_data.signer_info.more_info,
+                }
+                # signer information
+                signer_list.append(signer_dict)
+
+                if signed_data.signer_info.countersigner:
+                    if hasattr(signed_data.signer_info.countersigner, "issuer"):
+                        counter_signer_issuer_dn = (
+                            signed_data.signer_info.countersigner.issuer.dn
+                        )
+                    else:
+                        counter_signer_issuer_dn = (
+                            signed_data.signer_info.countersigner.signer_info.issuer.dn
+                        )
+
+                    if hasattr(signed_data.signer_info.countersigner, "serial_number"):
+                        counter_signer_sn = (
+                            signed_data.signer_info.countersigner.serial_number
+                        )
+                    else:
+                        counter_signer_sn = (
+                            signed_data.signer_info.countersigner.signer_info.serial_number
+                        )
+                    counter_signer_dict = {
+                        "issuer_dn": counter_signer_issuer_dn,
+                        "serial_number": str(counter_signer_sn),
+                        "signing_time": signed_data.signer_info.countersigner.signing_time.isoformat(),
+                    }
+                    counter_signer_list.append(counter_signer_dict)
+
+            except SignedPEParseError:
+                self.add_flag("no_cert_in_signed_data")
+                return
+
+        security_dict: dict[str, Any] = {
+            "certificates": cert_list,
+            "signers": signer_list,
+            "counter_signers": counter_signer_list,
+        }
+
+        try:
+            pe.verify()
+            security_dict["verification"] = True
+        except Exception as e:
+            security_dict["verification"] = False
+            security_dict["verification_error"] = str(e)
+
+        return security_dict

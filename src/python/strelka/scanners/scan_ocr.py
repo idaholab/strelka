@@ -7,10 +7,10 @@ import tempfile
 import pymupdf
 from PIL import Image
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanOcr(strelka.Scanner):
+class ScanOcr(Scanner):
     """
     Extracts optical text from image files and (optionally) generates a thumbnail using OCR
     (Optical Character Recognition).
@@ -68,7 +68,7 @@ class ScanOcr(strelka.Scanner):
 
         Args:
             data (bytes): Data of the file being scanned.
-            file (strelka.File): File object being scanned.
+            file (File): File object being scanned.
             options (dict): Options for the scanner.
             expire_at (datetime): Expiration time of the scan result.
         """
