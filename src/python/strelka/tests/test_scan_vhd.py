@@ -11,7 +11,7 @@ def test_scan_vhd(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 3, "extracted": 3},
@@ -60,7 +60,7 @@ def test_scan_vhd(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_vhdx(mocker):
@@ -69,7 +69,7 @@ def test_scan_vhdx(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 3, "extracted": 3},
@@ -123,4 +123,4 @@ def test_scan_vhdx(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

@@ -1,20 +1,25 @@
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_delay import ScanDelay as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_delay(mocker):
+scan_delay = fixtures.scanners.delay
+
+
+def test_scan_delay(
+    scan_delay: Scanner,
+    empty_file: File,
+) -> None:
     """
-    Pass: Scanner throws a ScannerTimeout exception, and adds a timed_out flag.
-    Failure: ScannerTimeout is not caught
+    Pass:   Scanner throws a ScannerTimeout exception, and adds a timed_out flag.
+    Fail:   ScannerTimeout is not caught.
     """
-
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["timed_out"]}
-
-    scanner_event = run_test_scan(
-        mocker=mocker, scan_class=ScanUnderTest, options={"scanner_timeout": 1}
+    test_event = make_event(
+        flags={"delay:timed_out"},
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_delay,
+        fixture=empty_file,
+        options={
+            "scanner_timeout": 1,
+        },
+        expected=test_event,
+    )

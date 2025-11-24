@@ -1,10 +1,10 @@
 import cv2
 import numpy as np
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanNf(strelka.Scanner):
+class ScanNf(Scanner):
     """
     Converts RGB image into the HSV (Hue, Saturation, Value) Color Space
     to determine the noise floor of the image.

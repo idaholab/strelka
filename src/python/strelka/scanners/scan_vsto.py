@@ -12,10 +12,10 @@ import hashlib
 
 import xmltodict
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanVsto(strelka.Scanner):
+class ScanVsto(Scanner):
     """
     Scanner class for extracting information from VSTO files.
 

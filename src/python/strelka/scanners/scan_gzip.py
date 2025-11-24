@@ -2,24 +2,24 @@ import gzip
 import io
 import zlib
 
-from strelka import strelka
+from . import File, Options, Scanner
+from ..model import Date
 
 
-class ScanGzip(strelka.Scanner):
+class ScanGzip(Scanner):
     """Decompresses gzip files."""
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         try:
-            with io.BytesIO(data) as gzip_io:
-                with gzip.GzipFile(fileobj=gzip_io) as gzip_obj:
-                    decompressed = gzip_obj.read()
-                    self.event["size"] = len(decompressed)
-
-                    # Send extracted file back to Strelka
-                    self.emit_file(decompressed, name=file.name)
-        except gzip.BadGzipFile:
-            self.flags.append("bad_gzip_file")
-        except zlib.error:
-            self.flags.append("bad_gzip_file")
+            with (
+                io.BytesIO(data) as data_fh,
+                gzip.GzipFile(fileobj=data_fh) as gzip_fh,
+            ):
+                self.emit_file(
+                    gzip_fh.read(),
+                    name=":gzip-contents",
+                )
+        except (gzip.BadGzipFile, zlib.error):
+            self.add_flag("decompression_error")
         except EOFError:
-            self.flags.append("eof_error")
+            self.add_flag("eof_error")

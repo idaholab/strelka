@@ -4,12 +4,12 @@ import requests
 import urllib3
 from requests.auth import HTTPBasicAuth
 
-from strelka import strelka
+from . import Scanner
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-class ScanFalconSandbox(strelka.Scanner):
+class ScanFalconSandbox(Scanner):
     """Sends files to Falcon Sandbox.
 
     Attributes:

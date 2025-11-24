@@ -1,23 +1,23 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_ccn import ScanCcn as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_ccn(mocker):
+scan_ccn = fixtures.scanners.ccn
+data_pii_csv = fixtures.data("test_pii.csv")
+
+
+def test_scan_ccn(
+    scan_ccn: Scanner,
+    data_pii_csv: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {"elapsed": mock.ANY, "flags": ["luhn_match"]}
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_pii.csv",
+    test_event = make_event(
+        flags={"ccn:luhn_match"},
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_ccn,
+        fixture=data_pii_csv,
+        expected=test_event,
+    )

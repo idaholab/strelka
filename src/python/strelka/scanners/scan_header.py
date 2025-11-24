@@ -1,9 +1,9 @@
 import binascii
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanHeader(strelka.Scanner):
+class ScanHeader(Scanner):
     """Collects file header.
 
     Options:

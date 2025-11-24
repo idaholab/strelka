@@ -1,26 +1,25 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_jnlp import ScanJnlp as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_jnlp(mocker):
+scan_jnlp = fixtures.scanners.jnlp
+data_jnlp = fixtures.data("test.jnlp")
+
+
+def test_scan_jnlp(
+    scan_jnlp: Scanner,
+    data_jnlp: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "resource": "https://example.com/uplib.jar",
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.jnlp",
+    test_event = make_event(
+        scan={
+            "resource": "https://example.com/uplib.jar",
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_jnlp,
+        fixture=data_jnlp,
+        expected=test_event,
+    )

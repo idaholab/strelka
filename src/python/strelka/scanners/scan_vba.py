@@ -2,12 +2,12 @@ import logging
 
 from oletools import olevba
 
-from strelka import strelka
+from . import Scanner
 
 logging.getLogger("olevba").setLevel(logging.WARNING)
 
 
-class ScanVba(strelka.Scanner):
+class ScanVba(Scanner):
     """Extracts and analyzes VBA from document files.
 
     Options:

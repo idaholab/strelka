@@ -1,13 +1,14 @@
 import io
 import zipfile
 
-import docx
 from bs4 import BeautifulSoup
+import docx
 
-from strelka import strelka
+from . import File, Options, Scanner
+from ..model import Date
 
 
-class ScanDocx(strelka.Scanner):
+class ScanDocx(Scanner):
     """Collects metadata and extracts text from docx files.
 
     Options:
@@ -16,75 +17,58 @@ class ScanDocx(strelka.Scanner):
             Defaults to False.
     """
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         extract_text = options.get("extract_text", False)
+
         with io.BytesIO(data) as docx_io:
             try:
-                docx_doc = docx.Document(docx_io)
-                self.event["author"] = docx_doc.core_properties.author
-                self.event["category"] = docx_doc.core_properties.category
-                self.event["comments"] = docx_doc.core_properties.comments
-                self.event["content_status"] = docx_doc.core_properties.content_status
-                if docx_doc.core_properties.created is not None:
-                    self.event["created"] = docx_doc.core_properties.created.isoformat()
-                self.event["identifier"] = docx_doc.core_properties.identifier
-                self.event["keywords"] = docx_doc.core_properties.keywords
-                self.event["language"] = docx_doc.core_properties.language
-                self.event["last_modified_by"] = (
-                    docx_doc.core_properties.last_modified_by
+                doc = docx.Document(docx_io)
+                self.event.update(
+                    {
+                        "total": {
+                            "words": 0,
+                            "images": 0,
+                        },
+                        "author": doc.core_properties.author,
+                        "category": doc.core_properties.category,
+                        "comments": doc.core_properties.comments,
+                        "content_status": doc.core_properties.content_status,
+                        "created": doc.core_properties.created,
+                        "identifier": doc.core_properties.identifier,
+                        "keywords": doc.core_properties.keywords,
+                        "language": doc.core_properties.language,
+                        "last_modified_by": doc.core_properties.last_modified_by,
+                        "last_printed": doc.core_properties.last_printed,
+                        "modified": doc.core_properties.modified,
+                        "revision": doc.core_properties.revision,
+                        "subject": doc.core_properties.subject,
+                        "title": doc.core_properties.title,
+                        "version": doc.core_properties.version,
+                        "font_colors": set(),
+                    }
                 )
-                if docx_doc.core_properties.last_printed is not None:
-                    self.event["last_printed"] = (
-                        docx_doc.core_properties.last_printed.isoformat()
-                    )
-                if docx_doc.core_properties.modified is not None:
-                    self.event["modified"] = (
-                        docx_doc.core_properties.modified.isoformat()
-                    )
-                self.event["revision"] = docx_doc.core_properties.revision
-                self.event["subject"] = docx_doc.core_properties.subject
-                self.event["title"] = docx_doc.core_properties.title
-                self.event["version"] = docx_doc.core_properties.version
-                self.event["font_colors"] = [""]
-                self.event["word_count"] = 0
-                self.event["image_count"] = 0
 
-                for paragraph in docx_doc.paragraphs:
+                for paragraph in doc.paragraphs:
                     soup = BeautifulSoup(paragraph.paragraph_format.element.xml, "xml")
-                    color_list = soup.select("color")
+                    self.event["font_colors"].update(
+                        c.attrs["w:val"] for c in soup.select("color")
+                    )
+                    self.event["total"]["images"] += sum(
+                        1 for i in soup.select("pic") if i.attrs["xmlns:pic"]
+                    )
+                    if paragraph.text.strip():
+                        self.event["total"]["words"] += len(paragraph.text.split(" "))
 
-                    for color_xml in color_list:
-                        color = color_xml.attrs["w:val"]
-                        if color not in self.event["font_colors"]:
-                            self.event["font_colors"].append(color)
+                self.event["white_text_in_doc"] = "FFFFFF" in self.event["font_colors"]
 
-                    image_list = soup.select("pic")
-
-                    for images in image_list:
-                        if images.attrs["xmlns:pic"]:
-                            self.event["image_count"] += 1
-
-                    para_words = paragraph.text.split(" ")
-
-                    if "" not in para_words:
-                        self.event["word_count"] += len(para_words)
-
-                if "FFFFFF" in self.event["font_colors"]:
-                    self.event["white_text_in_doc"] = True
-
+                # send document text contents back to Strelka if requested
                 if extract_text:
-                    text = ""
-                    for paragraph in docx_doc.paragraphs:
-                        text += f"{paragraph.text}\n"
+                    self.emit_file(
+                        "\n".join(p.text for p in doc.paragraphs).encode("utf-8"),
+                        name=":docx-text-contents",
+                    )
 
-                    # Send extracted file back to Strelka
-                    self.emit_file(text.encode("utf-8"), name="text")
-
-            except ValueError:
-                self.flags.append("value_error")
             except zipfile.BadZipFile:
-                self.flags.append("bad_zip")
-            except strelka.ScannerTimeout:
-                raise
+                self.add_flag("bad_zip")
             except Exception:
-                self.flags.append("bad_doc")
+                self.add_flag("bad_doc")

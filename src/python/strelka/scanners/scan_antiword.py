@@ -1,10 +1,10 @@
 import subprocess
 import tempfile
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanAntiword(strelka.Scanner):
+class ScanAntiword(Scanner):
     """Extracts text from MS Word document files.
 
     Options:

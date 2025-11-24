@@ -1,9 +1,9 @@
 import json
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanJson(strelka.Scanner):
+class ScanJson(Scanner):
     """Collects keys from JSON files."""
 
     def scan(self, data, file, options, expire_at):

@@ -1,23 +1,25 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_entropy import ScanEntropy as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_entropy(mocker):
+scan_entropy = fixtures.scanners.entropy
+data_exe = fixtures.data("test.exe")
+
+
+def test_scan_entropy(
+    scan_entropy: Scanner,
+    data_exe: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {"elapsed": mock.ANY, "flags": [], "entropy": 4.314502621279276}
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.exe",
+    test_event = make_event(
+        scan={
+            "entropy": 4.314502621279276,
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_entropy,
+        fixture=data_exe,
+        expected=test_event,
+    )

@@ -1,25 +1,35 @@
+import importlib.resources
+import re
+from typing import Final
+from unittest import TestCase
 import warnings
-from os import walk
-from os.path import isfile, join
-from pathlib import Path
 
 
-def test_required_for_scanner(mocker):
-    scanner_filenames = []
+name_re: Final = re.compile(r"^scan_([a-z][a-z0-9]*)\.py")
+missing_tests_message: Final = (
+    "Some scanners are missing unit tests!\n"
+    "\n"
+    "Scanners with missing tests:\n"
+    "    {}\n"
+)
 
-    scanner_path = Path(__file__).parent.parent / "scanners"
 
-    for dirpath, dirnames, filenames in walk(scanner_path):
-        scanner_filenames.extend(filenames)
-        break
+def test_required_for_scanner() -> None:
+    # walk through the contents of strelka.scanners in a more proper way so that
+    # we also include anything handled by our plugin loader
+    missing = set()
+    for scanner in importlib.resources.files("strelka.scanners").iterdir():
+        if not (m := name_re.match(scanner.name)):
+            continue
+        test_script = f"test_scan_{m.group(1)}.py"
+        # also look for the test in a plugin-compatible way
+        if not (importlib.resources.files("strelka.tests") / test_script).is_file():
+            missing.add(m.group(1))
 
-    scanner_filenames = sorted(scanner_filenames)
+    # if we had any missing, warn about it
+    if missing:
+        warnings.warn(missing_tests_message.format(", ".join(sorted(missing))))
 
-    for scanner_filename in scanner_filenames:
-        if scanner_filename != "__init__.py" and not isfile(
-            join(Path(__file__).parent, f"test_{scanner_filename}")
-        ):
-            warnings.warn(f"Missing scanner test {scanner_filename}")
-
-    # Tests are recommened, but not yet required for the test to pass
-    assert True
+    # while tests are currently strongly recommended, they aren't yet required
+    # for any given scanner; for the time being, always succeed
+    TestCase().assertTrue(True)

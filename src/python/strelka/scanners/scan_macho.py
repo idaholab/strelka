@@ -2,7 +2,7 @@ import tempfile
 
 from lief import MachO
 
-from strelka import strelka
+from . import Scanner
 
 CPU_SUBTYPES = {
     "ANY": {-2: "ANY", -1: "MULTIPLE", 0: "LITTLE_ENDIAN", 1: "BIG_ENDIAN"},
@@ -175,7 +175,7 @@ PROTECTIONS = {
 }
 
 
-class ScanMacho(strelka.Scanner):
+class ScanMacho(Scanner):
     """Collects metadata from Mach-O files."""
 
     def scan(self, data, file, options, expire_at):

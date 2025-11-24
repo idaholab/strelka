@@ -1,80 +1,185 @@
 import argparse
+import datetime
+from importlib import resources
 import logging
-import os
-import sys
-import time
-from importlib.resources import files
+from pathlib import Path
+import uuid
 
-import strelka.config
-import strelka.strelka
+from strelka.model.file import Tree
+from strelka.util import now
+
+from .backend import Task
+from .backend.local import LocalBackend
+from .config import BackendConfig
+from .model import File, serialize
+from .util.files import find_file
+from .util.collections import get_nested, set_nested
+from .plugins import register_plugin_paths
 
 
-def main():
+RSRC_BASE = resources.files("strelka.config")
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="strelka",
-        description="",
-        usage="%(prog)s [options]",
+        prog="strelka-standalone",
     )
-    parser.add_argument("filename")
-    parser.add_argument("-c", "--backend_cfg_path")
+    parser.add_argument(
+        "-P", "--path",
+        metavar="DIR",
+        default=[],
+        type=Path,
+        action="append",
+        help="additional location(s) to find plugins",
+    )
+    parser.add_argument(
+        "-p",
+        "--config-dir",
+        metavar="DIR",
+        type=Path,
+        help="path to backend configuration directory",
+    )
+    parser.add_argument(
+        "-c",
+        "--backend-cfg-path",
+        metavar="PATH",
+        type=Path,
+        help="path to backend configuration file",
+    )
+    parser.add_argument(
+        "-l",
+        "--logging-cfg-path",
+        metavar="PATH",
+        type=Path,
+        help="path to logging configuration file",
+    )
+    parser.add_argument(
+        "-Y",
+        "--yara-tasting-rules",
+        metavar="PATH",
+        type=Path,
+        help="path to tasting YARA rules",
+    )
+    parser.add_argument(
+        "-y",
+        "--yara-scanning-rules",
+        metavar="PATH",
+        type=Path,
+        help="path to scanning YARA rules",
+    )
+    parser.add_argument(
+        "-t",
+        "--tlsh-rules",
+        metavar="PATH",
+        type=Path,
+        help="path to TLSH rules",
+    )
+    parser.add_argument(
+        "-U",
+        "--root-uid",
+        type=uuid.UUID,
+        metavar="UUID",
+        default=uuid.uuid4(),
+        help="specify a root file ID",
+    )
+    parser.add_argument(
+        "-x",
+        "--disable-tracing",
+        action="store_true",
+        default=False,
+        help="disable tracing for this run",
+    )
+    parser.add_argument(
+        "filename",
+        type=Path,
+        help="the file to scan with Strelka",
+    )
 
     args = parser.parse_args()
 
-    print("starting local analysis...", file=sys.stderr)
+    with find_file(
+        args.backend_cfg_path,
+        (args.config_dir, "backend.yaml"),
+        RSRC_BASE / "backend.yaml",
+    ) as backend_cfg_path:
+        config = BackendConfig(backend_cfg_path)
+        cfg_dir = backend_cfg_path.parent
 
-    if args.backend_cfg_path:
-        config = strelka.config.BackendConfig(args.backend_cfg_path)
-    elif os.path.exists(files("strelka.config").joinpath("backend.yaml")):
-        config = strelka.config.BackendConfig(
-            files("strelka.config").joinpath("backend.yaml")
-        )
-    else:
-        config = strelka.config.BackendConfig()
+        with (
+            find_file(
+                args.logging_cfg_path,
+                (cfg_dir, config.get("logging_cfg")),
+                (args.config_dir, "logging.yaml"),
+                RSRC_BASE / "logging.yaml",
+            ) as logging_cfg_path,
+            find_file(
+                args.yara_tasting_rules,
+                (cfg_dir, config.get("tasting.yara_rules")),
+                (args.config_dir, "taste", "taste.yara"),
+                RSRC_BASE / "taste.yara",
+            ) as taste_rules,
+            find_file(
+                args.yara_scanning_rules,
+                (args.config_dir, "yara", "rules.yara"),
+                RSRC_BASE / "rules.yara",
+            ) as scan_rules,
+            find_file(
+                args.tlsh_rules,
+                (args.config_dir, "tlsh", "rules.yaml"),
+                RSRC_BASE / "tlsh.yaml",
+            ) as tlsh_rules,
+        ):
+            config["tasting.yara_rules"] = str(taste_rules)
+            config["logging_cfg"] = str(logging_cfg_path)
+            config.configure_logging()
 
-    if config:
-        if os.path.exists("/etc/strelka/taste/taste.yara"):
-            taste_path = "/etc/strelka/taste/taste.yara"
-        elif os.path.exists(files("strelka.config").joinpath("taste.yara")):
-            taste_path = str(files("strelka.config").joinpath("taste.yara"))
-        else:
-            logging.exception("no taste path found")
-            sys.exit(1)
+            # now register our plugin paths, since we have logging set up
+            logging.debug("considering plugins in:")
+            for path in args.path:
+                logging.debug(" - {}".format(path))
+            register_plugin_paths(args.path)
 
-        if os.path.exists("/etc/strelka/yara/rules.yara"):
-            yara_rules_path = "/etc/strelka/yara/rules.yara"
-        elif os.path.exists(files("strelka.config").joinpath("rules.yara")):
-            yara_rules_path = str(files("strelka.config").joinpath("rules.yara"))
-        else:
-            logging.exception("no yara rules path found")
-            sys.exit(1)
+            # patch YARA scanner rules locations
+            for rule in config.get("scanners.ScanYara", ()):
+                loc = get_nested(rule, "options.location")
+                if not loc or not Path(loc).exists():
+                    set_nested(rule, "options.location", str(scan_rules))
 
-        if os.path.exists("/etc/strelka/logging.yaml"):
-            logging_config_path = "/etc/strelka/logging.yaml"
-        elif os.path.exists(files("strelka.config").joinpath("logging.yaml")):
-            logging_config_path = str(files("strelka.config").joinpath("logging.yaml"))
-        else:
-            logging.exception("no logging configuration path found")
-            sys.exit(1)
+            # patch TLSH scanner rules locations
+            for rule in config.get("scanners.ScanTlsh", ()):
+                loc = get_nested(rule, "options.location")
+                if not loc or not Path(loc).exists():
+                    set_nested(rule, "options.location", str(tlsh_rules))
 
-        backend_cfg = config.dictionary
-        backend_cfg["tasting"]["yara_rules"] = taste_path
-        backend_cfg["scanners"]["ScanYara"][0]["options"]["location"] = yara_rules_path
-        backend_cfg["logging_cfg"] = logging_config_path
+            # provide a hook for disabling tracing, since standalone may not
+            # have a valid jaeger/whatever server running
+            if args.disable_tracing:
+                config.pop("telemetry.traces.exporter")
 
-        backend = strelka.strelka.Backend(backend_cfg, disable_coordinator=True)
+            # create our backend using the loaded config file
+            backend = LocalBackend(config)
+            logging.info("starting local analysis...")
 
-        with open(args.filename, "rb") as analysis_file:
-            data = analysis_file.read()
+            # guesstimate when we ought to expire
+            expire_at = now() + datetime.timedelta(minutes=15)
 
-            file = strelka.strelka.File(name=analysis_file.name, data=data)
+            # create our file object to analyze
+            file = File(
+                path=str(args.filename),
+                tree=Tree(root=args.root_uid),
+                has_data=True,
+            )
 
-            events = backend.distribute(file.uid, file, int(time.time()) + 300)
+            # store data in the backend for our file
+            with args.filename.open("rb") as analysis_file:
+                backend.store_file_data(file, analysis_file.read(), expire_at)
 
-            for event in events:
-                print(strelka.strelka.format_event(event))
-
-    else:
-        raise Exception("failed to initialize configuration")
+            # create a new task for our file, then perform analysis, dumping out events
+            # as they are received
+            task = Task.for_file(file, expire_at)
+            for event in backend.distribute(task):
+                print(event)
+                print(serialize(event))
 
 
 if __name__ == "__main__":

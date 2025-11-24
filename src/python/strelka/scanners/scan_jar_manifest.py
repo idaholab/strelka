@@ -1,9 +1,9 @@
 import ast
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanJarManifest(strelka.Scanner):
+class ScanJarManifest(Scanner):
     """Collects metadata from JAR manifest files."""
 
     def scan(self, data, file, options, expire_at):

@@ -1,17 +1,10 @@
 import time
 
-from strelka import strelka
+from . import File, Options, Scanner
 
 
-class ScanDelay(strelka.Scanner):
+class ScanDelay(Scanner):
     """Delays scanner execution."""
 
-    def scan(self, data, file, options, expire_at):
-        delay = options.get("delay", 5.0)
-
-        try:
-            time.sleep(delay)
-        except strelka.ScannerTimeout:
-            raise
-        except Exception:
-            self.flags.append("non-fatal_thing_happened")
+    def scan(self, data: bytes, file: File, options: Options, expire_at: float) -> None:
+        time.sleep(options.get("delay", 5.0))

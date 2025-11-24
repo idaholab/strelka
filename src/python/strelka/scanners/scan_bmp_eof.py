@@ -1,21 +1,20 @@
-from strelka import strelka
+from . import File, Options, Scanner
+from ..model import Date
 
 
-class ScanBmpEof(strelka.Scanner):
+class ScanBmpEof(Scanner):
     """
     Take the data of the BMP image, parse it, and determine if data is stored beyond
-    the expected marker.
+    the expected end of file.
     """
 
-    def scan(self, data, file, options, expire_at):
-        expectedSize = int.from_bytes(data[2:6], "little")
-        actualSize = len(data)
-        if expectedSize != actualSize:
-            self.event["trailer_index"] = expectedSize
-            trailer_bytes_data = data[expectedSize:]
-            self.event["BMP_EOF"] = data[expectedSize:]
-
-            # Send extracted file back to Strelka
-            self.emit_file(trailer_bytes_data)
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
+        expected_size = int.from_bytes(data[2:6], "little")
+        if expected_size != len(data):
+            self.event["trailer_start"] = expected_size
+            self.emit_file(
+                data[expected_size:],
+                name=":bmp-trailer",
+            )
         else:
-            self.flags.append("no_trailer")
+            self.add_flag("no_trailer")

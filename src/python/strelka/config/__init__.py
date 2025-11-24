@@ -1,39 +1,92 @@
+from __future__ import annotations
 import hashlib
+import json
 import logging
 import logging.config
 import os
+from pathlib import Path
+from typing import Any, Iterable, Iterator, Mapping, MutableMapping, overload
 
 import yaml
 
+from ..util.collections import get_nested, merge, pop_nested, set_nested
 
-class BackendConfig:
-    def __init__(self, backend_cfg_path: str = "/etc/strelka/backend.yaml") -> None:
-        self.dictionary: dict = {}
 
-        if not os.path.exists(backend_cfg_path):
-            raise Exception(f"backend configuration {backend_cfg_path} does not exist")
+Options = Mapping[str, Any]
+OptionsItems = Mapping[str, Any] | Iterator[tuple[str, Any]] | Iterable[tuple[str, Any]]
 
-        try:
-            with open(backend_cfg_path, "rb") as f:
-                config_data = f.read()
 
-                # Hash the config file, attach it to the config object
-                h = hashlib.new("sha1")
-                h.update(config_data)
-                self.dictionary.update({"sha1": h.hexdigest()})
+class BackendConfig(MutableMapping):
+    dictionary: dict
 
-                # Parse yaml
-                self.dictionary.update(yaml.safe_load(config_data))
-        except yaml.YAMLError:
-            logging.exception("backend configuration failed to parse")
-            raise
+    @overload
+    def __init__(self, config: str | Path) -> None: ...
+    @overload
+    def __init__(self, config: Options) -> None: ...
+    @overload
+    def __init__(self, config: None = None) -> None: ...
 
-        logging.info(f"loaded backend configuration from {backend_cfg_path}")
+    def __init__(self, config: str | Path | Options | None = None) -> None:
+        if isinstance(config, (str, Path)):
+            config_path = Path(config)
 
-        self.configure_logging()
+            if not config_path.exists():
+                raise FileNotFoundError(f"backend config {config_path} does not exist")
+
+            try:
+                with config_path.open("rb") as fh:
+                    self.dictionary = yaml.safe_load(fh)
+            except yaml.YAMLError:
+                logging.exception("backend configuration contains invalid YAML")
+                raise
+
+            logging.info(f"loaded backend configuration from {config_path}")
+
+        elif config is None:
+            self.dictionary = {}
+        else:
+            self.dictionary = dict(**config)
+
+        self._hash_config()
+
+    def _hash_config(self) -> str:
+        self.dictionary["sha1"] = None
+        serialized = json.dumps(
+            self.dictionary,
+            indent=None,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        sha1 = hashlib.sha1(serialized.encode()).hexdigest()
+        self.dictionary["sha1"] = sha1
+        return sha1
 
     def configure_logging(self):
         log_cfg_path = self.dictionary.get("logging_cfg")
-        if os.path.exists(log_cfg_path):
+        if log_cfg_path and os.path.exists(log_cfg_path):
             with open(log_cfg_path) as f:
                 logging.config.dictConfig(yaml.safe_load(f.read()))
+
+    def update_if_missing(self, what: OptionsItems) -> None:
+        self.dictionary = dict(merge(dict(what), self.dictionary))
+        self._hash_config()
+
+    def __getitem__(self, path: str) -> Any:
+        value = get_nested(self.dictionary, path, ...)
+        if value is ...:
+            raise KeyError(path)
+        return value
+
+    def __setitem__(self, path: str, value: Any) -> None:
+        set_nested(self.dictionary, path, value)
+        self._hash_config()
+
+    def __delitem__(self, path: str) -> None:
+        pop_nested(self.dictionary, path)
+        self._hash_config()
+
+    def __iter__(self) -> Iterator[str]:
+        yield from self.dictionary.keys()
+
+    def __len__(self) -> int:
+        return len(self.dictionary)

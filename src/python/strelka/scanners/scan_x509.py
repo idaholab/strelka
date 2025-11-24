@@ -2,10 +2,10 @@ import time
 
 from M2Crypto import X509
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanX509(strelka.Scanner):
+class ScanX509(Scanner):
     """Collects metadata from x509 and CRL files.
 
     x509 extensions require cleanup and may be improperly formatted.

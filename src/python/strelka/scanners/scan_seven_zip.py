@@ -5,7 +5,8 @@ import shutil
 import subprocess
 import tempfile
 
-from strelka import strelka
+from . import Scanner, Options
+from ..file import File
 
 from .common import password_cracking
 
@@ -14,12 +15,12 @@ class PasswordProtectedException(Exception):
     pass
 
 
-class ScanSevenZip(strelka.Scanner):
+class ScanSevenZip(Scanner):
     """Extracts files from 7zip archives"""
 
     EXCLUDED_ROOT_DIRS: list[str] = []
 
-    def scan(self, data: bytes, file: strelka.File, options: dict, expire_at) -> None:
+    def scan(self, data: bytes, file: File, options: Options, expire_at) -> None:
         file_limit = options.get("limit", 100)
         tmp_directory = options.get("tmp_file_directory", "/tmp/")
         scanner_timeout = options.get("scanner_timeout", 150)

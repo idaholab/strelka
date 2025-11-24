@@ -11,7 +11,7 @@ def test_scan_sevenzip(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 4, "extracted": 4},
@@ -48,7 +48,7 @@ def test_scan_sevenzip(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_sevenzip_wordlist(mocker):
@@ -57,7 +57,7 @@ def test_scan_sevenzip_wordlist(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["wordlist", "cracked_by_wordlist"],
         "total": {"files": 4, "extracted": 4},
@@ -101,7 +101,7 @@ def test_scan_sevenzip_wordlist(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_sevenzip_wordlist_filenames(mocker):
@@ -110,7 +110,7 @@ def test_scan_sevenzip_wordlist_filenames(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["wordlist", "cracked_by_wordlist"],
         "total": {"files": 4, "extracted": 4},
@@ -154,7 +154,7 @@ def test_scan_sevenzip_wordlist_filenames(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_sevenzip_nocrack_filenames(mocker):
@@ -163,7 +163,7 @@ def test_scan_sevenzip_nocrack_filenames(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 0, "extracted": 0},
@@ -180,7 +180,7 @@ def test_scan_sevenzip_nocrack_filenames(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_sevenzip_msi_filenames(mocker):
@@ -189,7 +189,7 @@ def test_scan_sevenzip_msi_filenames(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 3, "extracted": 3},
@@ -222,7 +222,7 @@ def test_scan_sevenzip_msi_filenames(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_sevenzip_brute(mocker):
@@ -231,7 +231,7 @@ def test_scan_sevenzip_brute(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": ["wordlist", "incremental", "cracked_by_incremental"],
         "total": {"files": 4, "extracted": 4},
@@ -281,4 +281,4 @@ def test_scan_sevenzip_brute(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

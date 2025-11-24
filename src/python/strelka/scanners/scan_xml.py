@@ -2,11 +2,12 @@ from typing import Any, Dict
 
 from lxml import etree
 
-from strelka import strelka
-from strelka.auxiliary.iocs import extract_iocs_from_string
+from . import Scanner, Options
+from ..file import File
+from ..auxiliary.iocs import extract_iocs_from_string
 
 
-class ScanXml(strelka.Scanner):
+class ScanXml(Scanner):
     """
     Collects metadata and extracts embedded files from XML files.
 
@@ -51,7 +52,7 @@ class ScanXml(strelka.Scanner):
     """
 
     def scan(
-        self, data: bytes, file: strelka.File, options: dict, expire_at: int
+        self, data: bytes, file: File, options: Options, expire_at: int
     ) -> None:
         """
         Parses XML data to extract metadata and files.

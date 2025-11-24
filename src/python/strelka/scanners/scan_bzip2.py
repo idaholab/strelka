@@ -1,23 +1,24 @@
 import bz2
 import io
 
-from strelka import strelka
+from . import File, Options, Scanner
+from ..model import Date
 
 
-class ScanBzip2(strelka.Scanner):
+class ScanBzip2(Scanner):
     """Decompresses bzip2 files."""
 
-    def scan(self, data, file, options, expire_at):
-        with io.BytesIO(data) as bzip2_io:
-            with bz2.BZ2File(filename=bzip2_io) as bzip2_obj:
-                try:
-                    decompressed = bzip2_obj.read()
-                    self.event["size"] = len(decompressed)
-
-                    # Send extracted file back to Strelka
-                    self.emit_file(decompressed, name=file.name)
-
-                except EOFError:
-                    self.flags.append("eof_error")
-                except OSError:
-                    self.flags.append("os_error")
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
+        try:
+            with (
+                io.BytesIO(data) as data_fh,
+                bz2.BZ2File(filename=data_fh) as bzip2_fh,
+            ):
+                self.emit_file(
+                    bzip2_fh.read(),
+                    name=":bzip2-contents",
+                )
+        except EOFError:
+            self.add_flag("eof_error")
+        except OSError:
+            self.add_flag("os_error")

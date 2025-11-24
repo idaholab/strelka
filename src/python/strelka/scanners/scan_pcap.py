@@ -8,10 +8,10 @@ import time
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanPcap(strelka.Scanner):
+class ScanPcap(Scanner):
     """Extract files from pcap/pcapng files, use Suricata to match alert signatures.
 
     Options:
@@ -236,8 +236,6 @@ class ScanPcap(strelka.Scanner):
                     self.event["total"]["connections"] = total_connections
                     self.event["connections"] = connections
 
-            except strelka.ScannerTimeout:
-                raise
             except Exception:
                 self.flags.append("zeek_extract_process_error")
                 raise
@@ -272,8 +270,6 @@ class ScanPcap(strelka.Scanner):
                         if os.path.exists(extracted_file_path):
                             self.upload(extracted_file_path, self.expire_at)
                             self.event["total"]["extracted"] += 1
-                    except strelka.ScannerTimeout:
-                        raise
                     except Exception:
                         self.flags.append("zeek_file_upload_error")
         except Exception:
@@ -313,8 +309,6 @@ class ScanPcap(strelka.Scanner):
                 if os.path.exists(suricata_log_file):
                     self._parse_suricata_log(suricata_log_file)
 
-            except strelka.ScannerTimeout:
-                raise
             except Exception:
                 self.flags.append("suricata_error")
                 raise

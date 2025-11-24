@@ -12,7 +12,7 @@ def test_scan_xml(mocker):
     Pass: Sample event matches output of scanner.
     Failure: Unable to load file or sample event fails to match.
     """
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "tags": unordered(["book", "author", "price", "year", "title"]),
@@ -46,7 +46,7 @@ def test_scan_xml(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_xml_with_file(mocker):
@@ -54,7 +54,7 @@ def test_scan_xml_with_file(mocker):
     Pass: Sample event matches output of scanner.
     Failure: Unable to load file or sample event fails to match.
     """
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "tags": unordered(
@@ -154,4 +154,4 @@ def test_scan_xml_with_file(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

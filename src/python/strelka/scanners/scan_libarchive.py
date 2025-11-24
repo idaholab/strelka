@@ -1,9 +1,9 @@
 import libarchive
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanLibarchive(strelka.Scanner):
+class ScanLibarchive(Scanner):
     """Extracts files from libarchive-compatible archives.
 
     Options:

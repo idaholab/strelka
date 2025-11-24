@@ -1,10 +1,22 @@
+# fmt: off
+
 import logging
 import subprocess
-from pathlib import Path
-from unittest import TestCase, mock
 
-from strelka.scanners.scan_clamav import ScanClamav as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import (
+    File,
+    Scanner,
+    fixtures,
+    make_event,
+    make_indicator,
+    make_rule,
+    run_test_scan,
+)
+
+
+scan_clamav = fixtures.scanners.clamav
+data_png = fixtures.data("test.png")
+data_eicar_com = fixtures.data("test_eicar.com")
 
 
 def retrieve_signatures():
@@ -29,32 +41,68 @@ def retrieve_signatures():
         logging.error(error_msg)
 
 
-def test_scan_clamav(mocker):
+def test_scan_clamav(
+    scan_clamav: Scanner,
+    data_png: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
     retrieve_signatures()
-    test_scan_event = {
-        "Data read": "0.51 MB (ratio 1.06",
-        "Data scanned": "0.54 MB",
-        "End Date": mock.ANY,
-        "Engine version": mock.ANY,
-        "Infected files": "0",
-        "Known viruses": mock.ANY,
-        "Scanned directories": "0",
-        "Scanned files": "1",
-        "Start Date": mock.ANY,
-        "Time": mock.ANY,
-        "elapsed": mock.ANY,
-        "flags": [],
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.png",
+    test_event = make_event(
+        related=[
+            make_indicator("md5", "8d39d685063ed37f21bc13a91276c2ca"),
+        ],
+        scan={
+            "magic": "CLAMJSONv0",
+            "root_file_type": "CL_TYPE_PNG",
+            "file_md5": "8d39d685063ed37f21bc13a91276c2ca",
+            "file_name": "test.png",
+            "file_size": 539355,
+            "file_type": "CL_TYPE_PNG",
+            "image_fuzzy_hash": {
+                "hash": "83b45dde63a52313",
+            },
+        },
+    )
+    run_test_scan(
+        scanner=scan_clamav,
+        fixture=data_png,
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+
+def test_scan_clamav_eicar(
+    scan_clamav: Scanner,
+    data_eicar_com: File,
+) -> None:
+    """
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
+    """
+    test_event = make_event(
+        related=[
+            make_indicator("md5", "69630e4574ec6798239b091cda43dca0"),
+        ],
+        scan={
+            "magic": "CLAMJSONv0",
+            "root_file_type": "CL_TYPE_TEXT_ASCII",
+            "file_md5": "69630e4574ec6798239b091cda43dca0",
+            "file_name": "test_eicar.com",
+            "file_size": 69,
+            "file_type": "CL_TYPE_TEXT_ASCII",
+            "viruses": ["Eicar-Signature"],
+        },
+        rules=[
+            make_rule(
+                provider="clamav",
+                name="Eicar-Signature",
+            ),
+        ],
+    )
+    run_test_scan(
+        scanner=scan_clamav,
+        fixture=data_eicar_com,
+        expected=test_event,
+    )

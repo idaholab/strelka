@@ -11,7 +11,7 @@ def test_scan_7z(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 4, "extracted": 4},
@@ -24,7 +24,7 @@ def test_scan_7z(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_cab_zip(mocker):
@@ -33,7 +33,7 @@ def test_scan_cab_zip(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 4, "extracted": 4},
@@ -46,7 +46,7 @@ def test_scan_cab_zip(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_cab_lzx(mocker):
@@ -55,7 +55,7 @@ def test_scan_cab_lzx(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 4, "extracted": 4},
@@ -68,7 +68,7 @@ def test_scan_cab_lzx(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_cpio(mocker):
@@ -77,7 +77,7 @@ def test_scan_cpio(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 1, "extracted": 1},
@@ -90,7 +90,7 @@ def test_scan_cpio(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_xar(mocker):
@@ -99,7 +99,7 @@ def test_scan_xar(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 1, "extracted": 1},
@@ -112,7 +112,7 @@ def test_scan_xar(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_deb(mocker):
@@ -121,7 +121,7 @@ def test_scan_deb(mocker):
     Failure: Unable to load file or sample event fails to match.
     """
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "flags": [],
         "total": {"files": 3, "extracted": 3},
@@ -134,4 +134,4 @@ def test_scan_deb(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

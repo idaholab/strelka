@@ -1,24 +1,20 @@
 import zlib
 
-from strelka import strelka
+from . import File, Options, Scanner
 
 
-class ScanZlib(strelka.Scanner):
+class ScanZlib(Scanner):
     """Decompresses zlib files."""
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: float) -> None:
         try:
-            # Decompress file and collect metadata
             decompressed = zlib.decompress(data)
             self.event["size"] = len(decompressed)
-
-            # Send extracted file back to Strelka
-            self.emit_file(decompressed, name=file.name)
-        except zlib.error:
-            self.flags.append(
-                f"{self.__class__.__name__} Exception: Invalid compression or decompression data."
+            self.emit_file(
+                decompressed,
+                name=file.name or "zlib-contents",
             )
-            return
-        except Exception as e:
-            self.flags.append(f"{self.__class__.__name__} Exception: {str(e)[:50]}")
-            return
+        except zlib.error:
+            self.add_flag("bad_zlib_data")
+        except EOFError:
+            self.add_flag("eof_error")

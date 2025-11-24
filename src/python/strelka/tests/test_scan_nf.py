@@ -1,101 +1,96 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_nf import ScanNf as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan
 
 
-def test_scan_nf_jpg(mocker):
+scan_nf = fixtures.scanners.nf
+data_jpg = fixtures.data("test.jpg")
+data_embed_rar_jpg = fixtures.data("test_embed_rar.jpg")
+data_png = fixtures.data("test.png")
+data_embed_rar_png = fixtures.data("test_embed_rar.png")
+
+
+def test_scan_nf_jpg(
+    scan_nf: Scanner,
+    data_jpg: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "percentage": 0.0,
-        "threshold": 0.25,
-        "noise_floor": True,
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.jpg",
+    test_event = make_event(
+        scan={
+            "percentage": 0.0,
+            "threshold": 0.25,
+            "noise_floor": True,
+        },
+    )
+    run_test_scan(
+        scanner=scan_nf,
+        fixture=data_jpg,
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_nf_jpg_embed_rar(mocker):
+def test_scan_nf_jpg_embed_rar(
+    scan_nf: Scanner,
+    data_embed_rar_jpg: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "percentage": 0.0007500390456161762,
-        "threshold": 0.25,
-        "noise_floor": True,
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_embed_rar.jpg",
+    test_event = make_event(
+        scan={
+            "percentage": 0.0007500390456161762,
+            "threshold": 0.25,
+            "noise_floor": True,
+        },
+    )
+    run_test_scan(
+        scanner=scan_nf,
+        fixture=data_embed_rar_jpg,
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_nf_png(mocker):
+def test_scan_nf_png(
+    scan_nf: Scanner,
+    data_png: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "percentage": 0.0,
-        "threshold": 0.25,
-        "noise_floor": True,
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.png",
+    test_event = make_event(
+        scan={
+            "percentage": 0.0,
+            "threshold": 0.25,
+            "noise_floor": True,
+        },
+    )
+    run_test_scan(
+        scanner=scan_nf,
+        fixture=data_png,
+        expected=test_event,
     )
 
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
 
-
-def test_scan_nf_png_embed_rar(mocker):
+def test_scan_nf_png_embed_rar(
+    scan_nf: Scanner,
+    data_embed_rar_png: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {
-        "elapsed": mock.ANY,
-        "flags": [],
-        "percentage": 0.0,
-        "threshold": 0.25,
-        "noise_floor": True,
-    }
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test_embed_rar.png",
+    test_event = make_event(
+        scan={
+            "percentage": 0.0,
+            "threshold": 0.25,
+            "noise_floor": True,
+        },
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_nf,
+        fixture=data_embed_rar_png,
+        expected=test_event,
+    )

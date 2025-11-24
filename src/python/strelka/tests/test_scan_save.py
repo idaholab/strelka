@@ -25,7 +25,7 @@ def test_scan_save_b64_gzip(mocker):
     with open(fixture_path, "rb") as f:
         file_contents = b64encode(gzip.compress(f.read()))
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "file": file_contents,
         "compression": compression,
@@ -42,7 +42,7 @@ def test_scan_save_b64_gzip(mocker):
 
     # gzip compression will produce slightly different output for each run
     TestCase.maxDiff = 4
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_save_b64_bzip2(mocker):
@@ -61,7 +61,7 @@ def test_scan_save_b64_bzip2(mocker):
     with open(fixture_path, "rb") as f:
         file_contents = b64encode(bz2.compress(f.read()))
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "file": file_contents,
         "compression": compression,
@@ -77,7 +77,7 @@ def test_scan_save_b64_bzip2(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_save_b85_lzma(mocker):
@@ -96,7 +96,7 @@ def test_scan_save_b85_lzma(mocker):
     with open(fixture_path, "rb") as f:
         file_contents = b85encode(lzma.compress(f.read()))
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "file": file_contents,
         "compression": compression,
@@ -112,7 +112,7 @@ def test_scan_save_b85_lzma(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)
 
 
 def test_scan_save_b64_none(mocker):
@@ -131,7 +131,7 @@ def test_scan_save_b64_none(mocker):
     with open(fixture_path, "rb") as f:
         file_contents = b64encode(f.read())
 
-    test_scan_event = {
+    test_event = {
         "elapsed": mock.ANY,
         "file": file_contents,
         "compression": compression,
@@ -147,4 +147,4 @@ def test_scan_save_b64_none(mocker):
     )
 
     TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    TestCase().assertDictEqual(test_event, scanner_event)

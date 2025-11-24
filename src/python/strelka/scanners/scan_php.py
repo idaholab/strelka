@@ -1,10 +1,10 @@
 import pygments
 from pygments import formatters, lexers
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanPhp(strelka.Scanner):
+class ScanPhp(Scanner):
     """Collects metadata from PHP files.
 
     Pygments is used as a lexer and the tokenized data is appended as metadata.

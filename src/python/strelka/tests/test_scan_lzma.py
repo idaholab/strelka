@@ -1,23 +1,31 @@
-from pathlib import Path
-from unittest import TestCase, mock
-
-from strelka.scanners.scan_lzma import ScanLzma as ScanUnderTest
-from strelka.tests import run_test_scan
+from strelka.tests import File, Scanner, fixtures, make_event, run_test_scan, make_child
 
 
-def test_scan_lzma(mocker):
+scan_lzma = fixtures.scanners.lzma
+data_xz = fixtures.data("test.xz")
+
+
+def test_scan_lzma(
+    scan_lzma: Scanner,
+    data_xz: File,
+) -> None:
     """
-    Pass: Sample event matches output of scanner.
-    Failure: Unable to load file or sample event fails to match.
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
     """
-
-    test_scan_event = {"elapsed": mock.ANY, "flags": [], "size": 4015}
-
-    scanner_event = run_test_scan(
-        mocker=mocker,
-        scan_class=ScanUnderTest,
-        fixture_path=Path(__file__).parent / "fixtures/test.xz",
+    test_event = make_event(
+        files=[
+            make_child(
+                "03fd5fdd-8401-53bd-a38b-c5a739c6421c",
+                name=":lzma-contents",
+                sha1="5030560d3a8f7e363d802cb9b1e1c82a65d60de7",
+                mime_type=["text/plain"],
+                size=4015,
+            ),
+        ],
     )
-
-    TestCase.maxDiff = None
-    TestCase().assertDictEqual(test_scan_event, scanner_event)
+    run_test_scan(
+        scanner=scan_lzma,
+        fixture=data_xz,
+        expected=test_event,
+    )

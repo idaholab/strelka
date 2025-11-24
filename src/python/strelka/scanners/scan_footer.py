@@ -1,9 +1,9 @@
 import binascii
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanFooter(strelka.Scanner):
+class ScanFooter(Scanner):
     """Collects file footer.
 
     Options:

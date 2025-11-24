@@ -2,10 +2,10 @@ import ast
 import plistlib
 import xml
 
-from strelka import strelka
+from . import Scanner
 
 
-class ScanPlist(strelka.Scanner):
+class ScanPlist(Scanner):
     """Parses keys found in property list files.
 
     Options:
