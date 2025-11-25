@@ -93,9 +93,7 @@ RUN echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_2
     curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_22.04/Release.key \
         | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
     apt-get -q update && \
-    apt-get install -q -y --no-install-recommends zeek-lts
-ENV PATH=$PATH:/opt/zeek/bin
-#clean up zeek install
+    apt-get install -q -y --no-install-recommends zeek-lts && \
     cp /opt/zeek/bin/zeek /bin/zeek && \
     rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
     rm -rf /opt/zeek/lib/*.a && \
