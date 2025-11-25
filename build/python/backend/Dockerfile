@@ -135,8 +135,12 @@ RUN chmod 777 /var/log/clamav/freshclam.log
 RUN chown clamav /var/log/clamav/freshclam.log
 RUN chown 1001:1001 /var/lib/clamav
 
+USER $USERNAME
+
 # Run freshclam so that we have -something- for signatures in the image (fix this)
 RUN freshclam
+
+USER root
 
 # Install runtime packages
 RUN apt-get -q update && \
