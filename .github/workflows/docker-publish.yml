@@ -16,6 +16,8 @@ on:
 jobs:
   docker:
     runs-on: ${{ matrix.os }}
+    outputs:
+      branch: ${{ steps.extract_branch.outputs.branch }}
     permissions:
       actions: write
       packages: write
@@ -54,11 +56,6 @@ jobs:
         run: echo "branch=$(echo ${GITHUB_REF#refs/heads/})" | sed "s/-build$//" >> $GITHUB_OUTPUT
         id: extract_branch
       -
-        name: Generate arch tag suffix
-        shell: bash
-        run: echo "archtag=$([[ "${{ matrix.platform }}" == 'linux/amd64' ]] && echo '' || ( echo -n '-' ; echo "${{ matrix.platform }}" | cut -d '/' -f 2) )" >> $GITHUB_OUTPUT
-        id: arch_tag_suffix
-      -
         name: Extract commit SHA
         shell: bash
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -91,4 +88,20 @@ jobs:
           push: true
           provenance: false
           platforms: ${{ matrix.platform }}
-          tags: ghcr.io/${{ github.repository_owner }}/strelka/${{ inputs.service }}:${{ steps.extract_branch.outputs.branch }}${{ steps.arch_tag_suffix.outputs.archtag }}
+          tags: ghcr.io/${{ github.repository_owner }}/strelka/${{ inputs.service }}:${{ steps.extract_branch.outputs.branch }}-${{ matrix.arch }}
+  manifest:
+    runs-on: ubuntu-latest
+    needs: docker
+    steps:
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/${{ github.repository_owner }}/strelka/${{ inputs.service }}:${{ needs.docker.outputs.branch }} \
+            ghcr.io/${{ github.repository_owner }}/strelka/${{ inputs.service }}:${{ needs.docker.outputs.branch }}-amd64 \
+            ghcr.io/${{ github.repository_owner }}/strelka/${{ inputs.service }}:${{ needs.docker.outputs.branch }}-arm64
