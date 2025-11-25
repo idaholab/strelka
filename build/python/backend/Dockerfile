@@ -96,7 +96,7 @@ RUN echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_2
     apt-get install -q -y --no-install-recommends zeek-lts && \
     cp /opt/zeek/bin/zeek /bin/zeek && \
     rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
-    rm -rf /opt/zeek/lib/*.a && \
+    rm -rf /opt/zeek/lib/*.a
 
 # Download and move binary for 7z 24.09
 RUN mkdir -p /tmp/install-7z && \
@@ -150,7 +150,7 @@ RUN apt-get -q update && \
     unrar \
     unzip \
     upx \
-    jq \
+    jq
 
 RUN apt-get clean -qq && \
     rm -rf /var/lib/apt/lists/*
