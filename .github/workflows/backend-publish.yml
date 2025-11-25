@@ -1,0 +1,15 @@
+name: backend-publish
+
+on:
+  push:
+    branches:
+      - malcolm-build
+  workflow_dispatch:
+  repository_dispatch:
+
+jobs:
+  docker:
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      service: backend
+      dockerfile: ./build/python/backend/Dockerfile
