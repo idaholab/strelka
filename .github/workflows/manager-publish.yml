@@ -1,4 +1,4 @@
-name: frontend-publish
+name: manager-publish
 
 on:
   push:
