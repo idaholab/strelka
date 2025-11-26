@@ -23,26 +23,25 @@ ARG USER_GID=$USER_UID
 RUN groupadd --gid $USER_GID $USERNAME && \
     useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME
 
-RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
-    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
-        > /etc/apt/apt.conf.d/keep-cache
 
 # Install build packages
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get -qq update && \
+    apt-get update -qq && \
     apt-get install -qq -y --no-install-recommends \
         automake build-essential ca-certificates cmake curl gcc git dirmngr \
         gnupg gpg libbz2-dev libgmp-dev libglu1-mesa liblzma-dev libpcap-dev \
         libtool libgomp1 make ncat openssh-client swig pkg-config supervisor \
         yasm zlib1g-dev && \
-    cpan -i Compress::Raw::Lzma
+    cpan -i Compress::Raw::Lzma && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get -qq update && \
+    apt-get update -qq && \
     apt-get install -qq -y --no-install-recommends \
-        libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev libffi-dev
+        libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev libffi-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 # Add tini to use as our init inside the container.
 ADD https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini-static /tini
@@ -75,7 +74,9 @@ RUN mkdir -p /tmp/build-jtr && \
     cp -Tr /jtr/run/ /jtr && \
     rm -rf /jtr/run && \
     chmod -R 777 /jtr && \
-    chown -R $USER_UID:$USER_UID /jtr
+    chown -R $USER_UID:$USER_UID /jtr && \
+    cd /tmp && \
+    rm -rf /tmp/build-jtr
 
 # Download and compile exiftool
 RUN mkdir -p /tmp/build-exiftool && \
@@ -85,25 +86,32 @@ RUN mkdir -p /tmp/build-exiftool && \
     cd exiftool-$EXIFTOOL_VERSION && \
     perl Makefile.PL && \
     make -s && \
-    make -s install
+    make -s install && \
+    cd /tmp && \
+    rm -rf /tmp/build-exiftool
 
 # install zeek
-RUN echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_22.04/ /' \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_22.04/ /' \
         | tee /etc/apt/sources.list.d/security:zeek.list && \
     curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_22.04/Release.key \
         | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
-    apt-get -q update && \
+    apt-get update -qq && \
     apt-get install -q -y --no-install-recommends zeek-lts && \
     cp /opt/zeek/bin/zeek /bin/zeek && \
     rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
-    rm -rf /opt/zeek/lib/*.a
+    rm -rf /opt/zeek/lib/*.a && \
+    rm -rf /var/lib/apt/lists/*
 
 # Download and move binary for 7z 24.09
 RUN mkdir -p /tmp/install-7z && \
     cd /tmp/install-7z && \
     curl -OL https://7-zip.org/a/7z2409-linux-x64.tar.xz && \
     tar -xf 7z2409-linux-x64.tar.xz && \
-    cp 7zz /usr/local/bin
+    cp 7zz /usr/local/bin && \
+    cd /tmp && \
+    rm -rf /tmp/install-7z
 
 # Install YARA
 RUN mkdir -p /tmp/build-yara && \
@@ -115,25 +123,33 @@ RUN mkdir -p /tmp/build-yara && \
     ./configure --with-crypto --enable-magic --enable-cuckoo && \
     make -s && \
     make -s install && \
-    make -s check
+    make -s check && \
+    cd /tmp && \
+    rm -rf /tmp/build-yara
 
-RUN apt-get -q update && \
-    apt-get install -q -y --no-install-recommends \
-    python-is-python3
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update -qq && \
+    apt-get install -qq -y --no-install-recommends \
+    python-is-python3 && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install ClamAV
-RUN apt-get update -qq && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update -qq -qq && \
     apt-get install -qq -y --no-install-recommends \
     clamav \
     clamav-base \
     clamav-daemon \
-    clamav-freshclam 
+    clamav-freshclam && \
+    rm -rf /var/lib/apt/lists/*
 
 # Update permissions for relevant fresclam log files
-RUN touch /var/log/clamav/freshclam.log
-RUN chmod 777 /var/log/clamav/freshclam.log
-RUN chown clamav /var/log/clamav/freshclam.log
-RUN chown 1001:1001 /var/lib/clamav
+RUN touch /var/log/clamav/freshclam.log && \
+    chmod 777 /var/log/clamav/freshclam.log && \
+    chown clamav:clamav /var/log/clamav/freshclam.log && \
+    chown 1001:1001 /var/lib/clamav
 
 USER $USERNAME
 
@@ -143,8 +159,10 @@ RUN freshclam
 USER root
 
 # Install runtime packages
-RUN apt-get -q update && \
-    apt-get install -q -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update -qq && \
+    apt-get install -qq -y --no-install-recommends \
     antiword \
     binwalk \
     libzbar0 \
@@ -154,9 +172,7 @@ RUN apt-get -q update && \
     unrar \
     unzip \
     upx \
-    jq
-
-RUN apt-get clean -qq && \
+    jq && \
     rm -rf /var/lib/apt/lists/*
 
 # Assign permissions to Strelka scan result logging directory
@@ -183,7 +199,9 @@ RUN mkdir -p /tmp/build-yara-python && \
     tar -xf v$YARA_VERSION.tar.gz && \
     cd yara-python-$YARA_VERSION && \
     python3 setup.py build --dynamic-linking && \
-    python3 setup.py install
+    python3 setup.py install && \
+    cd /tmp && \
+    rm -rf /tmp/build-yara-python
 
 RUN python3 -m pip install -U pip setuptools && \
     python3 -m pip install poetry ruamel.yaml rich-argparse semver && \
