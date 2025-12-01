@@ -1,5 +1,5 @@
 # Base and setup configuration
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 ARG DEBIAN_FRONTEND=noninteractive
 LABEL maintainer="Target Brands, Inc. TTS-CFC-OpenSource@target.com"
 
@@ -90,20 +90,6 @@ RUN mkdir -p /tmp/build-exiftool && \
     cd /tmp && \
     rm -rf /tmp/build-exiftool
 
-# install zeek
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_22.04/ /' \
-        | tee /etc/apt/sources.list.d/security:zeek.list && \
-    curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_22.04/Release.key \
-        | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
-    apt-get update -qq && \
-    apt-get install -q -y --no-install-recommends zeek-lts && \
-    cp /opt/zeek/bin/zeek /bin/zeek && \
-    rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
-    rm -rf /opt/zeek/lib/*.a && \
-    rm -rf /var/lib/apt/lists/*
-
 # Download and move binary for 7z 24.09
 RUN mkdir -p /tmp/install-7z && \
     cd /tmp/install-7z && \
@@ -133,6 +119,42 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -qq -y --no-install-recommends \
     python-is-python3 && \
     rm -rf /var/lib/apt/lists/*
+
+# install zeek
+ARG ZEEK_INTEGRATION=1
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "$ZEEK_INTEGRATION" = "1" ]; then \
+        echo "Zeek enabled — installing…"; \
+        echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_24.04/ /' \
+            | tee /etc/apt/sources.list.d/security:zeek.list && \
+        curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_24.04/Release.key \
+            | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
+        apt-get -qq update && \
+        apt-get install -qq -y --no-install-recommends zeek-lts && \
+        cp /opt/zeek/bin/zeek /bin/zeek && \
+        rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
+        rm -rf /opt/zeek/lib/*.a && \
+        rm -rf /var/lib/apt/lists/*
+    else \
+        echo "Zeek disabled — skipping."; \
+    fi
+
+# install suricata
+ARG SURICATA_INTEGRATION=1
+ARG SURICATA_VERSION_PATTERN="1:7.0.*"
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "$SURICATA_INTEGRATION" = "1" ]; then \
+        echo "Suricata enabled — installing…"; \
+        apt-get -qq update && \
+        apt-get install -qq -y --no-install-recommends \
+            suricata=${SURICATA_VERSION_PATTERN} \
+            suricata-update && \
+        rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "Suricata disabled — skipping."; \
+    fi
 
 # Install ClamAV
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
