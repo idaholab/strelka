@@ -46,8 +46,8 @@ EMPTY_EVENT: Final = {
     "flags": [],
     "exceptions": [],
     "scan": {
-        "_elapsed": ...,
-        "_scanner": ...,
+        "elapsed": ...,
+        "scanner": ...,
     },
 }
 
