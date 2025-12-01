@@ -1,7 +1,9 @@
-# fmt: off
-
 import logging
+from pathlib import Path
 import subprocess
+
+import clamd
+from pytest import fixture
 
 from strelka.tests import (
     File,
@@ -19,38 +21,97 @@ data_png = fixtures.data("test.png")
 data_eicar_com = fixtures.data("test_eicar.com")
 
 
-def retrieve_signatures():
-    """
-    Utility function that will retrieve the ClamAV signature DB when called. Currently this is set up to run
-    when initializing the ClamAV scanner test. Should take around 10-15 seconds to retrieve the signatures from the remote DB.
-    """
-    logging.info("Retrieving ClamAV signatures via freshclam.")
-    try:
-        # Run freshclam to get the newest database signature
-        with subprocess.Popen(
-            ["freshclam"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        ) as proc:
-            stdout, stderr = proc.communicate()
+@fixture(scope="session")
+def clamav_signatures() -> None:
+    # do the signatures exist in the standard location?
+    if Path("/var/lib/clamav/main.cvd").exists():
+        return
 
-        logging.info(stdout)
+    # hmmm... they're not in the standard location, let's try to run clamscan
+    result = subprocess.run(
+        ["clamscan", "--quiet", "-"],
+        input="",
+        capture_output=True,
+    )
+    if result.returncode != 2:
+        return
 
-    except Exception as e:
-        error_msg = f"Failed to download clam signatures: {e}"
-        logging.error(error_msg)
+    # nope, no signatures, run freshclam to acquire some
+    logging.info("Retrieving ClamAV signatures via freshclam...")
+    result = subprocess.run(
+        ["freshclam"],
+        capture_output=True,
+        check=True,
+    )
+    logging.info(f"Output from freshclam:\n{result.stdout}")
 
 
-def test_scan_clamav(
+@fixture(scope="session")
+def clamd_socket() -> str:
+    assert clamd.ClamdNetworkSocket(host="localhost").ping() == "PONG"
+    return "localhost"
+
+
+def test_scan_clamav_remote(
     scan_clamav: Scanner,
     data_png: File,
+    clamd_socket: str,
 ) -> None:
     """
     Pass:   Sample event matches output of scanner.
     Fail:   Sample event fails to match.
     """
-    retrieve_signatures()
     test_event = make_event(
+        flags={"clamav:remote"},
+    )
+    run_test_scan(
+        scanner=scan_clamav,
+        fixture=data_png,
+        expected=test_event,
+        options={"clamd_socket": clamd_socket},
+    )
+
+
+def test_scan_clamav_remote_eicar(
+    scan_clamav: Scanner,
+    data_eicar_com: File,
+    clamd_socket: str,
+) -> None:
+    """
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
+    """
+    test_event = make_event(
+        flags={
+            "clamav:remote",
+            "clamav:signature_match",
+        },
+        rules=[
+            make_rule(
+                provider="clamav",
+                name="Eicar-Signature",
+            ),
+        ],
+    )
+    run_test_scan(
+        scanner=scan_clamav,
+        fixture=data_eicar_com,
+        expected=test_event,
+        options={"clamd_socket": clamd_socket},
+    )
+
+
+def test_scan_clamav_local(
+    scan_clamav: Scanner,
+    data_png: File,
+    clamav_signatures,
+) -> None:
+    """
+    Pass:   Sample event matches output of scanner.
+    Fail:   Sample event fails to match.
+    """
+    test_event = make_event(
+        flags={"clamav:local"},
         related=[
             make_indicator("md5", "8d39d685063ed37f21bc13a91276c2ca"),
         ],
@@ -73,15 +134,20 @@ def test_scan_clamav(
     )
 
 
-def test_scan_clamav_eicar(
+def test_scan_clamav_local_eicar(
     scan_clamav: Scanner,
     data_eicar_com: File,
+    clamav_signatures,
 ) -> None:
     """
     Pass:   Sample event matches output of scanner.
     Fail:   Sample event fails to match.
     """
     test_event = make_event(
+        flags={
+            "clamav:local",
+            "clamav:signature_match",
+        },
         related=[
             make_indicator("md5", "69630e4574ec6798239b091cda43dca0"),
         ],

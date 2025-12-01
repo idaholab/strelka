@@ -644,6 +644,22 @@ reference = "2fd80f732dd9422a9e92556758180ceee3b5b4ec"
 resolved_reference = "2fd80f732dd9422a9e92556758180ceee3b5b4ec"
 
 [[package]]
+name = "clamd"
+version = "1.0.3.dev0"
+description = "Clamd is a python interface to Clamd (Clamav daemon)."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = []
+develop = false
+
+[package.source]
+type = "git"
+url = "https://github.com/graingert/python-clamd"
+reference = "24b21e8c875b88ba8a03c29ba2ef04887a8d56c5"
+resolved_reference = "24b21e8c875b88ba8a03c29ba2ef04887a8d56c5"
+
+[[package]]
 name = "click"
 version = "8.1.8"
 description = "Composable command line interface toolkit"
@@ -4056,4 +4072,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<=3.12"
-content-hash = "70789d5aee455d131200fa39426e79d2c8bb10dd81d88e7f8f78a73db0293972"
+content-hash = "c76d0f294e1436b8413799d5d512b449e6c514e16e0dae471724e827ab3f7d59"

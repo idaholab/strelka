@@ -1,9 +1,13 @@
+import io
 import json
 import os.path
 from pathlib import Path
+import re
 import subprocess
 import tempfile
-from typing import Any, Iterable
+from typing import Any, ClassVar, Iterable
+
+import clamd
 
 from . import Options, Scanner
 from ..model import Date, File
@@ -50,22 +54,68 @@ class ScanClamav(Scanner):
 
     """
 
+    DEFAULT_PORT: ClassVar = 3310
+    PORT_RE: ClassVar = re.compile(r"^([-A-Za-z0-9_.]+)(?::(\d+))?$")
+
     def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
+        if options.get("clamd_socket", None) is not None:
+            self.scan_remote(data, file, options)
+        else:
+            self.scan_local(data, file, options)
+
+    def signature_matched(self, sig: str) -> None:
+        self.add_flag("signature_match")
+        self.add_rule_match(name=sig, provider=self.key)
+
+    def scan_remote(self, data: bytes, file: File, options: Options) -> None:
+        clamd_socket = options.get("clamd_socket")
+
+        self.add_flag("remote")
+
+        try:
+            if clamd_socket and clamd_socket.startswith("/"):
+                conn = clamd.ClamdUnixSocket(path=clamd_socket)
+            elif clamd_socket and (m := self.PORT_RE.match(clamd_socket)):
+                host, port, *_ = *filter(None, m.groups()), self.DEFAULT_PORT
+                conn = clamd.ClamdNetworkSocket(host=host, port=int(port))
+            else:
+                self.add_flag("invalid_socket_option")
+                return
+            if conn is None:
+                pass
+            with io.BytesIO(data) as clam_io:
+                result = conn.instream(clam_io)
+                if result is None or "stream" not in result:
+                    self.add_flag("empty_result")
+                _, sig = (result or {}).get("stream", (None, None))
+                if sig is not None:
+                    self.signature_matched(sig)
+
+        except clamd.ConnectionError:
+            self.add_flag("conn_error")
+        except clamd.BufferTooLongError:
+            self.add_flag("size_error")
+        except clamd.ClamdError:
+            self.add_flag("other_error")
+
+    def scan_local(self, data: bytes, file: File, options: Options) -> None:
         freshen = options.get("freshen", False)
-        freshclam = self.find_executable("freshclam", options.get("freshclam", None))
-        clamscan = self.find_executable("clamscan", options.get("clamscan", None))
-        tmp_directory = options.get("tmp_directory", tempfile.gettempdir())
+        freshclam = self.find_executable("freshclam", options.get("freshclam"))
+        clamscan = self.find_executable("clamscan", options.get("clamscan"))
+        tmp_dir = options.get("tmp_directory", tempfile.gettempdir())
+
+        self.add_flag("local")
 
         if not clamscan or not os.path.exists(clamscan):
-            self.add_flag("clamav_not_installed_error")
+            self.add_flag("not_installed_error")
             return
 
-        # if requested, run freshclam to get the newest database
-        # signatures; we don't always do this because signatures may be
-        # managed/freshened by an outside source
+        # if requested, run freshclam to get the newest database signatures; we
+        # don't always do this because signatures may be managed/freshened by an
+        # outside source
         if freshen:
             if not freshclam or not os.path.exists(freshclam):
-                self.add_flag("clamav_maybe_outdated_signatures")
+                self.add_flag("maybe_outdated_signatures")
             else:
                 try:
                     subprocess.run(
@@ -73,13 +123,13 @@ class ScanClamav(Scanner):
                         capture_output=True,
                         check=True,
                     )
-                except Exception as e:
-                    self.add_flag("clamav_maybe_outdated_signatures", e)
+                except Exception:
+                    self.add_flag("maybe_outdated_signatures")
 
         try:
             with (
-                tempfile.NamedTemporaryFile(dir=tmp_directory, mode="wb") as tmp_data,
-                tempfile.TemporaryDirectory(dir=tmp_directory) as tmp_scan,
+                tempfile.NamedTemporaryFile(dir=tmp_dir, mode="wb") as tmp_data,
+                tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_scan,
             ):
                 tmp_data_path = Path(tmp_data.name)
                 # write our file data out to a tempfile so we can easily scan it
@@ -107,7 +157,7 @@ class ScanClamav(Scanner):
                         metadata = json.load(fh)
                     break
                 else:
-                    self.add_flag("clamav_missing_metadata")
+                    self.add_flag("missing_metadata")
                     metadata = {}
 
                 def _walk_metadata(value, _) -> Any:
@@ -127,7 +177,7 @@ class ScanClamav(Scanner):
                         elif k == "viruses":
                             assert isinstance(v, Iterable)
                             for name in v:
-                                self.add_rule_match(name=name, provider=self.key)
+                                self.signature_matched(name)
                         return k, v
                     return value
 
@@ -135,4 +185,4 @@ class ScanClamav(Scanner):
                 self.event.update(metadata)
 
         except Exception:
-            self.add_flag("clamav_scan_process_error")
+            self.add_flag("scan_process_error")
