@@ -135,7 +135,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         cp /opt/zeek/bin/zeek /bin/zeek && \
         rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
         rm -rf /opt/zeek/lib/*.a && \
-        rm -rf /var/lib/apt/lists/*
+        rm -rf /var/lib/apt/lists/*; \
     else \
         echo "Zeek disabled — skipping."; \
     fi
