@@ -13,3 +13,6 @@ jobs:
     with:
       service: backend
       dockerfile: ./build/python/backend/Dockerfile
+      extra_build_args: |
+        SURICATA_INTEGRATION=0
+        ZEEK_INTEGRATION=0
