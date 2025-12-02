@@ -1,31 +1,38 @@
 from __future__ import annotations
 from abc import ABCMeta, abstractmethod
+import contextlib
 import dataclasses
 import datetime
+import itertools
 import logging
 import math
+from os import PathLike
+import os
 from pathlib import Path
+import subprocess
 import sys
+import tempfile
 import time
 from types import EllipsisType
 from typing import (
     Any,
     ClassVar,
     Hashable,
+    IO,
     Iterable,
     Iterator,
     Literal,
     Mapping,
+    NoReturn,
     TYPE_CHECKING,
     overload,
 )
-from typing_extensions import deprecated
 import uuid
-import itertools
 
 import inflection
 from opentelemetry import trace
 from pydantic import BaseModel
+from typing_extensions import deprecated
 
 from .. import backend  # noqa: F401
 from ..exceptions import ScannerException, ScannerTimeout
@@ -41,9 +48,10 @@ from ..model import (
     ScannerResults,
 )
 from ..telemetry.traces import SpanCreatorMixin
+from ..util import ensure_string
 from ..util.collections import ListCompatibleSet, dataclass_to_dict, filter_mapping
 from ..util.files import find_executable
-from ..util.timeout import timeout_after
+from ..util.timeout import BaseTimeout, timeout_after
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -56,17 +64,21 @@ Expiration = float
 UniqueKey = tuple[Hashable, ...]
 
 
+class _ScannerFatalError(BaseException):
+    pass
+
+
 class ScannerUtilMethods:
     @overload
-    @staticmethod
-    def evaluate_limit(value: int) -> int: ...
+    @classmethod
+    def evaluate_limit(cls, value: int) -> int: ...
 
     @overload
-    @staticmethod
-    def evaluate_limit(value: float) -> float: ...
+    @classmethod
+    def evaluate_limit(cls, value: float) -> float: ...
 
-    @staticmethod
-    def evaluate_limit(value: int | float) -> int | float:
+    @classmethod
+    def evaluate_limit(cls, value: int | float) -> int | float:
         if isinstance(value, int):
             if value < 0:
                 return sys.maxsize
@@ -76,16 +88,20 @@ class ScannerUtilMethods:
                 return math.inf
             return value
 
-    @staticmethod
-    def normalize_key(key: str, words: set[str] | None = None) -> str:
+    @classmethod
+    def normalize_key(cls, key: str, words: set[str] | None = None) -> str:
         for word in words or ():
             key = key.replace(word, word.title())
         return inflection.underscore(
             key.replace(" ", "_").replace("/", "_").replace(".", "_")
         )
 
-    @staticmethod
-    def find_executable(program: str, path: str | Path | None) -> str | None:
+    @classmethod
+    def find_executable(
+        cls,
+        program: str | bytes | PathLike | None,
+        path: str | bytes | PathLike | None = None,
+    ) -> str | None:
         return find_executable(program, path)
 
 
@@ -208,6 +224,200 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         )
 
     @property
+    def tmp_directory(self) -> str:
+        return self.options.get("tmp_directory", tempfile.gettempdir())
+
+    def run_program(
+        self,
+        program: str | bytes | PathLike,
+        args: Iterable[Any] = (),
+        /,
+        *,
+        program_path: str | bytes | PathLike | None = None,
+        input: str | IO[bytes] | IO[str] | None = None,
+        output: (
+            Literal["capture", "drop"]
+            | None
+            | subprocess._FILE
+            | tuple[IO[bytes] | IO[str], IO[bytes] | IO[str]]
+        ) = "capture",
+        shell: bool = False,
+        cwd: None | str | bytes | PathLike = None,
+        timeout: float | None = None,
+        check: bool = False,
+        valid_returncodes: Iterable[int] = (0,),
+        encoding: str | None = None,
+        errors: str | None = None,
+        text: bool | None = None,
+        env: Mapping[Any, Any] | None = None,
+        **popen_kwargs,
+    ) -> subprocess.CompletedProcess:
+        program_path = self.find_executable(program, program_path)
+        if program_path is None:
+            raise FileNotFoundError(f"unable to locate program: {program}")
+
+        args = [program_path, *map(ensure_string, args)]
+        stdin = None
+        stdout = None
+        stderr = None
+
+        if input is not None and not isinstance(input, (str, bytes)):
+            stdin, input = input, None
+
+        if output == "capture":
+            stdout = stderr = subprocess.PIPE
+        elif output == "drop":
+            stdout = stderr = subprocess.DEVNULL
+        elif isinstance(output, IO):
+            stdout = output
+        elif isinstance(output, tuple):
+            stdout, stderr = output
+        else:
+            stdout = output
+
+        if cwd is not None:
+            cwd = ensure_string(cwd)
+        if env is not None:
+            env = {ensure_string(k): ensure_string(v) for k, v in env.items()}
+
+        process = subprocess.Popen(
+            args,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            cwd=cwd,
+            env=env,
+            shell=shell,
+            encoding=encoding,
+            errors=errors,
+            text=text,
+            **popen_kwargs,
+        )
+        try:
+            out, err = process.communicate(input, timeout)
+        except BaseTimeout:
+            process.kill()
+            process.wait()
+            self.add_flag("subprocess_killed", None)
+            raise
+        except subprocess.TimeoutExpired:
+            self.add_flag("subprocess_timed_out", None)
+            process.kill()
+            process.wait()
+            self.add_flag("subprocess_killed", None)
+            raise
+        else:
+            rc = process.returncode
+            if check and rc not in set(valid_returncodes):
+                raise subprocess.CalledProcessError(rc, args, out, err)
+            return subprocess.CompletedProcess(args, rc, out, err,)
+
+    @overload
+    @contextlib.contextmanager
+    def new_temporary_file(
+        self,
+        data: None = None,
+        *,
+        encoding: None = None,
+        buffering: int = -1,
+        named: bool = False,
+        spooled: bool = False,
+        **kwargs,
+    ) -> Iterator[IO[bytes]]: ...
+
+    @overload
+    @contextlib.contextmanager
+    def new_temporary_file(
+        self,
+        data: None = None,
+        *,
+        encoding: str,
+        errors: str | None = None,
+        buffering: int = -1,
+        chunk_size: int = 102400,
+        named: bool = False,
+        spooled: bool = False,
+        **kwargs,
+    ) -> Iterator[IO[str]]: ...
+
+    @overload
+    @contextlib.contextmanager
+    def new_temporary_file(
+        self,
+        data: bytes | IO[bytes],
+        *,
+        encoding: None = None,
+        buffering: int = -1,
+        chunk_size: int = 102400,
+        named: bool = False,
+        spooled: bool = False,
+        **kwargs,
+    ) -> Iterator[IO[bytes]]: ...
+
+    @overload
+    @contextlib.contextmanager
+    def new_temporary_file(
+        self,
+        data: str | IO[str],
+        *,
+        encoding: str,
+        errors: str | None = None,
+        buffering: int = -1,
+        chunk_size: int = 102400,
+        named: bool = False,
+        spooled: bool = False,
+        **kwargs,
+    ) -> Iterator[IO[str]]: ...
+
+    @contextlib.contextmanager
+    def new_temporary_file(
+        self,
+        data: str | bytes | IO[str] | IO[bytes] | None = None,
+        *,
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        chunk_size: int = 102400,
+        named: bool = False,
+        spooled: bool = False,
+        **kwargs,
+    ) -> Iterator[IO[str] | IO[bytes]]:
+        if named:
+            handle_cls = tempfile.NamedTemporaryFile
+        elif spooled:
+            handle_cls = tempfile.SpooledTemporaryFile
+        else:
+            handle_cls = tempfile.TemporaryFile
+
+        with handle_cls(
+            mode=("w+" if encoding is not None else "w+b"),
+            buffering=buffering,
+            encoding=encoding,
+            errors=errors,
+            dir=self.tmp_directory,
+            **kwargs,
+        ) as handle:
+            if isinstance(data, (str, bytes)):
+                handle.write(data)
+            elif isinstance(data, IO):
+                while d := data.read(chunk_size):
+                    handle.write(d)
+            handle.flush()
+            handle.seek(0, os.SEEK_SET)
+            yield handle
+
+    @contextlib.contextmanager
+    def new_temporary_dir(
+        self,
+        **kwargs,
+    ) -> Iterator[Path]:
+        with tempfile.TemporaryDirectory(
+            dir=self.tmp_directory,
+            **kwargs,
+        ) as handle:
+            yield Path(handle)
+
+    @property
     def trace_attributes(self) -> Iterator[tuple[str, Any]]:
         yield "scanner.name", self.name
         yield "scanner.timeout", self.scanner_timeout
@@ -253,6 +463,9 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
 
         except ScannerTimeout:
             self.add_flag("timed_out", None)
+
+        except _ScannerFatalError:
+            pass
 
         except ScannerException:
             self.add_exception()
@@ -375,8 +588,11 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         self,
         flag: str,
         exception: BaseException | None | EllipsisType = ...,
+        msg: str | None = None,
     ) -> None:
         self.flags.add(flag)
+        if msg is not None:
+            exception = RuntimeError(msg)
         if exception is ...:
             exception = sys.exception()
         if exception is not None:
@@ -388,10 +604,22 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
                 )
             )
 
+    def fail(
+        self,
+        flag: str,
+        exception: BaseException | None | EllipsisType = ...,
+        msg: str | None = None,
+    ) -> NoReturn:
+        self.add_flag(flag, exception, msg)
+        raise _ScannerFatalError()
+
     def add_exception(
         self,
         exception: BaseException | None | EllipsisType = ...,
+        msg: str | None = None,
     ) -> None:
+        if msg is not None:
+            exception = RuntimeError(msg)
         if exception is ...:
             exception = sys.exception()
         if exception is not None:
@@ -402,10 +630,12 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
                 )
             )
 
-    def _parse_indicator(self, what: Any, type: str | None = None) -> Iterator[Indicator]:
+    def _parse_indicator(
+        self, what: Any, type: str | None = None
+    ) -> Iterator[Indicator]:
         try:
             yield from Indicator.parse(what, self, type=type)
-        except:
+        except Exception:
             logging.exception("failed to parse indicator: %r", what)
 
     @deprecated("Use Scanner.add_related() or Scanner.add_rule_match() instead.")
@@ -516,9 +746,11 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
                         "ruleset": ruleset,
                         "uuid": uuid,
                         "version": version,
-                        "matched": set(itertools.chain(
-                            *(self._parse_indicator(m) for m in matched)
-                        )),
+                        "matched": set(
+                            itertools.chain(
+                                *(self._parse_indicator(m) for m in matched)
+                            )
+                        ),
                     },
                 )
             )

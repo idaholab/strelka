@@ -3,9 +3,12 @@ import contextlib
 from importlib import resources
 from importlib.resources.abc import Traversable
 import os
+from os import PathLike
 from pathlib import Path
 import shutil
 from typing import Iterator
+
+from . import ensure_string
 
 
 __all__ = (
@@ -48,19 +51,24 @@ def safe_join_path(*parts: str | Path | None) -> Path | None:
     return Path(first).joinpath(*rest)
 
 
-def find_executable(program: str, path: str | Path | None) -> str | None:
-    # if we were given a path, expand home directories and check to see if it is
-    # absolute (since relative paths make no sense in a config file), exists, and is
-    # executable; if it doesn't, clear it out so we can try to find it instead
-    if path:
-        path = Path(path).expanduser()
+def find_executable(
+    program: str | bytes | PathLike | None,
+    path: str | bytes | PathLike | None = None,
+) -> str | None:
+    # if we were given a path, convert it to a path, expand home directories, and check
+    # to see if it is absolute (since relative paths make no sense in a config file),
+    # exists, and is executable; if it doesn't, clear it out so we try to find it
+    if path is not None:
+        path = Path(ensure_string(path)).expanduser()
         if not (path.is_absolute() and path.is_file() and os.access(path, os.X_OK)):
             path = None
-    # we either weren't given a path, or the path given didn't meet requirements; try to
-    # look for the program in our path, if we can't find it, just bail
-    if path is None:
+    # we either weren't given a path, or the path given didn't meet requirements; if we
+    # were mistakenly given a full path as our program, try to use that, otherwise try
+    # to look for the program in our path
+    if path is None and program is not None:
+        program = ensure_string(program)
+        if os.sep in program:
+            return find_executable(None, program)
         path = shutil.which(program)
-        if path is None:
-            return None
-    # success: we have a location!
-    return str(path)
+    # return either our final, located executable path as a string, or None if we failed
+    return str(path) if path is not None else None
