@@ -1,10 +1,8 @@
 import io
 import json
-import os.path
 from pathlib import Path
 import re
 import subprocess
-import tempfile
 from typing import Any, ClassVar, Iterable
 
 import clamd
@@ -79,8 +77,7 @@ class ScanClamav(Scanner):
                 host, port, *_ = *filter(None, m.groups()), self.DEFAULT_PORT
                 conn = clamd.ClamdNetworkSocket(host=host, port=int(port))
             else:
-                self.add_flag("invalid_socket_option")
-                return
+                self.fail("invalid_socket_option")
             if conn is None:
                 pass
             with io.BytesIO(data) as clam_io:
@@ -100,46 +97,36 @@ class ScanClamav(Scanner):
 
     def scan_local(self, data: bytes, file: File, options: Options) -> None:
         freshen = options.get("freshen", False)
-        freshclam = self.find_executable("freshclam", options.get("freshclam"))
-        clamscan = self.find_executable("clamscan", options.get("clamscan"))
-        tmp_dir = options.get("tmp_directory", tempfile.gettempdir())
+        freshclam_path = options.get("freshclam")
+        clamscan_path = options.get("clamscan")
 
         self.add_flag("local")
 
-        if not clamscan or not os.path.exists(clamscan):
-            self.add_flag("not_installed_error")
-            return
-
-        # if requested, run freshclam to get the newest database signatures; we
-        # don't always do this because signatures may be managed/freshened by an
-        # outside source
+        # if requested (and able), run freshclam to get the newest database
+        # signatures; we don't always do this because signatures may be
+        # managed/freshened by an outside source
         if freshen:
-            if not freshclam or not os.path.exists(freshclam):
-                self.add_flag("maybe_outdated_signatures")
-            else:
-                try:
-                    subprocess.run(
-                        [freshclam],
-                        capture_output=True,
-                        check=True,
-                    )
-                except Exception:
-                    self.add_flag("maybe_outdated_signatures")
+            try:
+                self.run_program(
+                    "freshclam",
+                    program_path=freshclam_path,
+                    output="drop",
+                    check=True,
+                )
+            except FileNotFoundError:
+                self.add_flag("freshclam_not_installed", None)
+            except subprocess.CalledProcessError:
+                self.add_flag("signature_update_failed")
 
-        try:
-            with (
-                tempfile.NamedTemporaryFile(dir=tmp_dir, mode="wb") as tmp_data,
-                tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_scan,
-            ):
-                tmp_data_path = Path(tmp_data.name)
-                # write our file data out to a tempfile so we can easily scan it
-                tmp_data.write(data)
-                tmp_data.flush()
-
-                # run the actual ClamAV scan and report to local temp log file
-                subprocess.run(
+        with (
+            self.new_temporary_file(data, named=True) as tmp_data,
+            self.new_temporary_dir() as tmp_scan,
+        ):
+            # run the actual ClamAV scan and report to local temp log file
+            try:
+                result = self.run_program(
+                    "clamscan",
                     [
-                        clamscan,
                         "--disable-cache",
                         f"--tempdir={tmp_scan}",
                         f"--log={tmp_scan}/log.txt",
@@ -147,42 +134,45 @@ class ScanClamav(Scanner):
                         "--gen-json",
                         tmp_data.name,
                     ],
-                    capture_output=True,
+                    program_path=clamscan_path,
+                    output="capture",
                     encoding="utf-8",
-                    check=False,
                 )
+            except FileNotFoundError:
+                self.fail("clamscan_not_installed", None)
+            if result.returncode == 2:
+                self.fail("clamscan_failed", msg=f"Output:\n{result.stderr}")
 
-                for path in Path(tmp_scan).rglob("*/metadata.json"):
-                    with path.open("r") as fh:
-                        metadata = json.load(fh)
-                    break
-                else:
-                    self.add_flag("missing_metadata")
-                    metadata = {}
+            for path in Path(tmp_scan).rglob("*/metadata.json"):
+                with path.open("r") as fh:
+                    metadata = json.load(fh)
+                break
+            else:
+                self.add_flag("missing_metadata")
+                metadata = {}
 
-                def _walk_metadata(value, _) -> Any:
-                    if isinstance(value, tuple) and len(value) == 2:
-                        k, v = self.normalize_key(value[0]), value[1]
-                        if k == "file_path":
-                            raise SkipItem
-                        elif k == "file_name":
-                            assert isinstance(v, str)
-                            if (p := Path(v)).parts[0] == tmp_data_path.name:
-                                if file.name:
-                                    v = Path(file.name, *p.parts[1:])
-                                else:
-                                    v = Path(*p.parts[1:])
-                        elif k == "file_md5":
-                            self.add_related([v])
-                        elif k == "viruses":
-                            assert isinstance(v, Iterable)
-                            for name in v:
-                                self.signature_matched(name)
-                        return k, v
-                    return value
+            tmp_data_path = Path(tmp_data.name)
 
-                metadata = visit(metadata, _walk_metadata)
-                self.event.update(metadata)
+            def _walk_metadata(value, _) -> Any:
+                if isinstance(value, tuple) and len(value) == 2:
+                    k, v = self.normalize_key(value[0]), value[1]
+                    if k == "file_path":
+                        raise SkipItem
+                    elif k == "file_name":
+                        assert isinstance(v, str)
+                        if (p := Path(v)).parts[0] == tmp_data_path.name:
+                            if file.name:
+                                v = Path(file.name, *p.parts[1:])
+                            else:
+                                v = Path(*p.parts[1:])
+                    elif k == "file_md5":
+                        self.add_related([v])
+                    elif k == "viruses":
+                        assert isinstance(v, Iterable)
+                        for name in v:
+                            self.signature_matched(name)
+                    return k, v
+                return value
 
-        except Exception:
-            self.add_flag("scan_process_error")
+            metadata = visit(metadata, _walk_metadata)
+            self.event.update(metadata)
