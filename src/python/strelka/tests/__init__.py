@@ -1,14 +1,10 @@
 import base64
 import binascii
-
 import builtins
 from datetime import UTC, datetime, timedelta
-
 import hashlib
 import importlib
-
 from pathlib import Path
-
 from types import EllipsisType
 from typing import (
     Any,
@@ -25,15 +21,14 @@ from unittest import TestCase, mock
 from uuid import UUID
 
 import inflection
-
 import pytest
 
 from ..backend import BaseBackend
 from ..model import File, NULL_UUID, Tree
-from ..scanners import Options, FileResults, Scanner
-from ..util import _MISSING, MISSING
-from ..util.collections import filter_mapping, merge, visit
 from ..model import serialize
+from ..scanners import FileResults, Options, Scanner
+from ..util import MISSING, _MISSING
+from ..util.collections import filter_mapping, merge, visit
 
 
 ExceptionCondition = type[BaseException] | tuple[type[BaseException], ...]
@@ -181,8 +176,8 @@ def make_child(
         "source": source,
         "type": type,
         **{
-            k: v for k, v in
-            [
+            k: v
+            for k, v in [
                 ("name", name),
                 ("path", path),
                 ("extension", extension),
@@ -386,8 +381,11 @@ def run_test_scan(
     # backend configuration file, and any options provided as an argument
     options = merge(
         DEFAULT_SCANNER_OPTIONS,
-        backend.config.get(f"testing.options.{scanner.name}", {}),
-        options,
+        backend.config.options_for_scanner(
+            scanner.name,
+            backend.config.get(f"testing.options.{scanner.name}", {}),
+            options,
+        ),
     )
 
     # get our file data from the backend

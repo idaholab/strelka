@@ -256,7 +256,18 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         if program_path is None:
             raise FileNotFoundError(f"unable to locate program: {program}")
 
-        args = [program_path, *(ensure_string(a) for a in args if a is not None)]
+        def _expand_arg(arg: Any) -> Iterator[str]:
+            if arg is None:
+                return
+            if isinstance(arg, tuple):
+                for a in arg:
+                    yield from _expand_arg(a)
+            elif isinstance(arg, os.PathLike):
+                yield str(Path(os.fspath(arg)).expanduser())
+            else:
+                yield ensure_string(arg)
+
+        args = [program_path, *itertools.chain(*map(_expand_arg, args))]
         stdin = None
         stdout = None
         stderr = None
@@ -451,7 +462,7 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         start = time.time()
         self.event = {}
         self.file = file
-        self.options = options
+        self.options = self.backend.config.options_for_scanner(self.name, options)
         self.expire_at = expire_at
 
         try:
