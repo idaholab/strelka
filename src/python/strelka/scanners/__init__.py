@@ -256,7 +256,7 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         if program_path is None:
             raise FileNotFoundError(f"unable to locate program: {program}")
 
-        args = [program_path, *map(ensure_string, args)]
+        args = [program_path, *(ensure_string(a) for a in args if a is not None)]
         stdin = None
         stdout = None
         stderr = None
