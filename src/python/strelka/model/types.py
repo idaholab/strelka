@@ -117,7 +117,7 @@ MACAddress = EUI48
 Octal = Annotated[
     int,
     PlainSerializer(lambda v: f"0{v:o}"),
-    PlainValidator(lambda v: int(v, 8)),
+    PlainValidator(lambda v: v if isinstance(v, int) else int(v, 8)),
 ]
 ScannerKey = Annotated[str, PlainValidator(_scanner_key)]
 UUID = uuid.UUID
