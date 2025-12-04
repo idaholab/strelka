@@ -9,7 +9,7 @@ setuptools.setup(
     author="Target Brands, Inc.",
     description="strelka: container-based file analysis at scale",
     license="Apache 2.0",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=["tests"]),
     scripts=["bin/strelka-backend"],
     zip_safe=False,
     entry_points={
