@@ -21,8 +21,8 @@ from uuid import UUID
 import uuid
 
 from pydantic import Field, PlainValidator, model_validator
-from ssdeep import hash as ssdeep_hash
-from tlsh import hash as tlsh_hash
+from ssdeep import Hash as ssdeep
+from tlsh import Tlsh as tlsh
 
 from ..util.collections import get_nested
 from .base import Model
@@ -42,6 +42,7 @@ __all__ = (
 
 NULL_UUID: Final = uuid.UUID(int=0)
 _T: Final = TypeVar("_T")
+AnyData = bytes | bytearray | memoryview
 
 
 class Hash(Model, frozen=True):
@@ -55,15 +56,36 @@ class Hash(Model, frozen=True):
     tlsh: str | None = None
 
     @classmethod
-    def for_data(cls, data: bytes | bytearray | memoryview[int]) -> Self:
+    def for_data(cls, data: AnyData | Iterable[AnyData]) -> Self:
+        hashes = {
+            "md5": md5(),
+            "sha1": sha1(),
+            "sha256": sha256(),
+            "sha384": sha384(),
+            "sha512": sha512(),
+            "ssdeep": ssdeep(),
+            "tlsh": tlsh(),
+        }
+
+        if isinstance(data, (bytes, bytearray, memoryview)):
+            data_iter = [data]
+        else:
+            data_iter = data
+
+        for block in data_iter:
+            for h in hashes.values():
+                h.update(block)
+
+        hashes["tlsh"].final()
+
         return cls(
-            md5=md5(data).hexdigest(),
-            sha1=sha1(data).hexdigest(),
-            sha256=sha256(data).hexdigest(),
-            sha384=sha384(data).hexdigest(),
-            sha512=sha512(data).hexdigest(),
-            ssdeep=ssdeep_hash(data),
-            tlsh=tlsh_hash(data),
+            md5=hashes["md5"].hexdigest(),
+            sha1=hashes["sha1"].hexdigest(),
+            sha256=hashes["sha256"].hexdigest(),
+            sha384=hashes["sha384"].hexdigest(),
+            sha512=hashes["sha512"].hexdigest(),
+            ssdeep=hashes["ssdeep"].digest(),
+            tlsh=hashes["tlsh"].hexdigest(),
         )
 
 
@@ -131,6 +153,8 @@ class FileType(StrEnum):
     socket = "socket"
     symlink = "symlink"
     whiteout = "whiteout"
+
+    unknown = "unknown"
 
 
 def _expand_mime_type(value: str | Iterable[str]) -> set[str]:
@@ -226,7 +250,8 @@ class File(Model, frozen=True):
                 attrs.add(FileAttribute.setgid)
             if this.mode & stat.S_ISVTX:
                 attrs.add(FileAttribute.sticky)
-            _set("attributes", attrs)
+            if attrs:
+                _set("attributes", attrs)
 
         # if we weren't explicitly given a pointer, use our UUID
         _set("pointer", str(this.pointer or this.tree.node))
