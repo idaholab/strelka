@@ -6,10 +6,10 @@ LABEL maintainer="Target Brands, Inc. TTS-CFC-OpenSource@target.com"
 # User configuration
 ARG CONFIG_TESTS=false
 
-ARG TINI_VERSION=0.19.0
 ARG JOHN_VERSION=1.9.1-ce
 ARG YARA_VERSION=4.3.1
 ARG EXIFTOOL_VERSION=12.60
+ARG CAPA_VERSION=9.3.1
 
 # Environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         automake build-essential ca-certificates cmake curl gcc git dirmngr \
         gnupg gpg libbz2-dev libgmp-dev libglu1-mesa liblzma-dev libpcap-dev \
         libtool libgomp1 make ncat openssh-client swig pkg-config supervisor \
-        yasm zlib1g-dev && \
+        yasm zlib1g-dev tini && \
     cpan -i Compress::Raw::Lzma && \
     rm -rf /var/lib/apt/lists/*
 
@@ -42,10 +42,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -qq -y --no-install-recommends \
         libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev libffi-dev && \
     rm -rf /var/lib/apt/lists/*
-
-# Add tini to use as our init inside the container.
-ADD https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini-static /tini
-RUN chmod a+rx /tini
 
 # Install JTR; this is -very, very slow to build- so do it -as early as
 # possible- so we hopefully don't ever have to redo it. Ever. Please. The
@@ -205,14 +201,18 @@ RUN mkdir /var/log/strelka/ && \
 USER $USERNAME
 
 RUN export HOME=/home/$USERNAME && \
-    curl -fsSL https://pyenv.run | bash
+    curl -fsSL https://pyenv.run | bash && \
+    mkdir -p $HOME/.local/bin
 
 ENV PYENV_ROOT=/home/$USERNAME/.pyenv
-ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims:$PATH
+ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims:/home/$USERNAME/.local/bin:$PATH
 
 RUN export HOME=/home/$USERNAME && \
     pyenv install 3.11 && \
     pyenv global 3.11
+
+# Install common Python build dependencies
+RUN python3 -m pip install -U pip setuptools pyinstaller
 
 # Install yara-python
 RUN mkdir -p /tmp/build-yara-python && \
@@ -224,6 +224,25 @@ RUN mkdir -p /tmp/build-yara-python && \
     python3 setup.py install && \
     cd /tmp && \
     rm -rf /tmp/build-yara-python
+
+# Build/install CAPA
+RUN mkdir -p /tmp/build-capa && \
+    python3 -m venv /tmp/build-capa && \
+    cd /tmp/build-capa && \
+    . ./bin/activate && \
+    curl -fsSLo ./capa.zip https://github.com/mandiant/capa/archive/refs/tags/v$CAPA_VERSION.zip && \
+    curl -fsSLo ./rules.zip https://github.com/mandiant/capa-rules/archive/refs/tags/v$CAPA_VERSION.zip && \
+    unzip -q ./capa.zip && \
+    unzip -q ./rules.zip && \
+    cd capa-$CAPA_VERSION && \
+    python3 -m pip install -e .[build] && \
+    mv ../capa-rules-$CAPA_VERSION/* ./rules/ && \
+    python3 ./scripts/cache-ruleset.py rules/ cache && \
+    pyinstaller ./.github/pyinstaller/pyinstaller.spec && \
+    chmod 755 ./dist/capa && \
+    mv ./dist/capa /home/$USERNAME/.local/bin/capa && \
+    deactivate && \
+    rm -rf /tmp/build-capa
 
 RUN python3 -m pip install -U pip setuptools && \
     python3 -m pip install poetry ruamel.yaml rich-argparse semver && \
@@ -274,6 +293,6 @@ RUN rm -rf /etc/strelka/
 # FIXME: use a script to drop permissions on entry, so that we can install plugins, etc.
 USER $USERNAME
 
-ENTRYPOINT ["/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["/home/strelka/.pyenv/bin/pyenv", "exec", "strelka-backend"]
 
