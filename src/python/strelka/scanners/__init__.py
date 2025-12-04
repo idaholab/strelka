@@ -562,6 +562,10 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
     ) -> uuid.UUID | None:
         """Re-ingest extracted file"""
 
+        # as a convenience, drop any keyword arguments that are ellipses; this allows
+        # for simpler implementation of "include this field if it's present in <X>"
+        kwargs = {k: v for k, v in kwargs.items() if v is not ...}
+
         # either we were given some combination of deterministic keys (e.g. position in
         # file/stream, filename, etc.), or we rely upon the order the scanner generates
         # children to be deterministic; if neither of these are true, scanning will
