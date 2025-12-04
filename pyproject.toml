@@ -99,6 +99,7 @@ cart = "^1.2.3"
 black = "^25.1.0"
 isort = "^6.0.1"
 flake8 = "^7.1.2"
+Cython = "*"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
