@@ -12,6 +12,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import textwrap
 import time
 from types import EllipsisType
 from typing import (
@@ -66,6 +67,34 @@ UniqueKey = tuple[Hashable, ...]
 
 class _ScannerFatalError(BaseException):
     pass
+
+
+class ScannerCalledProcessError(subprocess.CalledProcessError):
+    _include_stderr_in_str: bool
+
+    def __init__(
+        self,
+        returncode: int,
+        cmd: subprocess._CMD,
+        output: str | bytes | None = None,
+        stderr: str | bytes | None = None,
+        include_stderr_in_str: bool = True,
+    ) -> None:
+        super().__init__(returncode, cmd, output, stderr)
+        self._include_stderr_in_str = include_stderr_in_str
+
+    def __str__(self) -> str:
+        if self._include_stderr_in_str and self.stderr:
+            return "Command {!r} exited with failure status {}; STDERR:\n{}".format(
+                self.cmd,
+                self.returncode,
+                textwrap.indent(self.stderr, "  > "),
+            )
+        else:
+            return "Command {!r} exited with failure status {}.".format(
+                self.cmd,
+                self.returncode,
+            )
 
 
 class ScannerUtilMethods:
@@ -250,6 +279,7 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         errors: str | None = None,
         text: bool | None = None,
         env: Mapping[Any, Any] | None = None,
+        include_stderr_in_exception: bool = True,
         **popen_kwargs,
     ) -> subprocess.CompletedProcess:
         program_path = self.find_executable(program, program_path)
@@ -320,8 +350,10 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         else:
             rc = process.returncode
             if check and rc not in set(valid_returncodes):
-                raise subprocess.CalledProcessError(rc, args, out, err)
-            return subprocess.CompletedProcess(args, rc, out, err,)
+                raise ScannerCalledProcessError(
+                    rc, args, out, err, include_stderr_in_exception
+                )
+            return subprocess.CompletedProcess(args, rc, out, err)
 
     @overload
     @contextlib.contextmanager
