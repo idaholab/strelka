@@ -26,7 +26,6 @@ _NamespacePath = Any
 PLUGIN_PATH_ENV_VAR: Final = "STRELKA_PLUGIN_PATH"
 CACHE_TAG: Final = sys.implementation.cache_tag
 MULTIARCH_CACHE_TAG: Final = "-".join([CACHE_TAG, sys.implementation._multiarch])
-# yaml: Final = ruamel.yaml.YAML()
 
 
 @dataclass(repr=False)
@@ -246,20 +245,25 @@ class PluginPathFinder(MetaPathFinder):
         src = []
         search = []
         for plugin in self.__plugin_cache.values():
-            # check if we know about this module as a namespace directory
-            if (this_path := plugin.namespaces.get(name)) is not None:
+            par_path = plugin.namespaces.get(parentname)
+            # if an associated module script exists, store that
+            if par_path and (this_path := par_path / f"{thisname}.py").exists():
+                src.append((plugin, this_path))
+            # if a compiled module exists, store that
+            elif (
+                par_path
+                and (
+                    this_path := par_path / f"{thisname}.{MULTIARCH_CACHE_TAG}.so"
+                ).exists()
+            ):
+                src.append((plugin, this_path))
+            # otherwise check if we know about this module as a namespace directory
+            elif (this_path := plugin.namespaces.get(name)) is not None:
                 # if it has initialization code, store that
                 if (init_path := this_path / "__init__.py").exists():
                     src.append((plugin, init_path))
                 # and regardless, store its submodule lookup path
                 search.append((plugin, this_path))
-            # check if we know about this module's parent
-            elif (par_path := plugin.namespaces.get(parentname)) is not None:
-                # if an associated module script exists, store that
-                if (this_path := par_path / f"{thisname}.py").exists():
-                    src.append((plugin, this_path))
-                elif (this_path := par_path / f"{thisname}.{MULTIARCH_CACHE_TAG}.so").exists():
-                    src.append((plugin, this_path))
         # if we found nothing, it doesn't exist, bail now
         if not src and not search:
             return None
