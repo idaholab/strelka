@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import hashlib
 import importlib
 from pathlib import Path
+import re
 from types import EllipsisType
 from typing import (
     Any,
@@ -32,68 +33,18 @@ from ..util.collections import filter_mapping, merge, visit
 
 
 ExceptionCondition = type[BaseException] | tuple[type[BaseException], ...]
-
-
-EMPTY_EVENT: Final = {
-    "files": [],
-    "related": [],
-    "rules": [],
-    "flags": [],
-    "exceptions": [],
-    "scan": {
-        "elapsed": ...,
-        "scanner": ...,
-    },
-}
-
-
-EMPTY_CHILD: Final = {
-    "tree": {
-        "root": str(NULL_UUID),
-        "node": ...,
-        "parent": str(NULL_UUID),
-        "depth": 1,
-    },
-    "source": ...,
-    "metadata": ...,
-    "flavors": ...,
-    "accessed": ...,
-    "attributes": ...,
-    "created": ...,
-    "ctime": ...,
-    "device": ...,
-    "directory": ...,
-    "drive_letter": ...,
-    "extension": ...,
-    "fork_name": ...,
-    "gid": ...,
-    "group": ...,
-    "inode": ...,
-    "mime_type": ...,
-    "mode": ...,
-    "mtime": ...,
-    "name": ...,
-    "origin_referrer_url": ...,
-    "origin_url": ...,
-    "owner": ...,
-    "path": ...,
-    "size": ...,
-    "target_path": ...,
-    "uid": ...,
-    "hash": {
-        "cdhash": ...,
-        "md5": ...,
-        "sha1": ...,
-        "sha256": ...,
-        "sha384": ...,
-        "sha512": ...,
-        "ssdeep": ...,
-        "tlsh": ...,
-    },
-}
-
-
 MockAny = EllipsisType
+
+
+TESTS_DIR: Final = Path(__file__).parent
+DEFAULT_SCANNER_OPTIONS: Final = {
+    "scanner_timeout": 30,
+}
+DEFAULT_BACKEND_CONFIG: Final = {
+    "limits": {
+        "scanner": 30,
+    },
+}
 
 
 def make_child(
@@ -277,7 +228,20 @@ def make_event(
 
     return dict(
         visit(
-            merge(EMPTY_EVENT, contents),
+            merge(
+                {
+                    "files": [],
+                    "related": [],
+                    "rules": [],
+                    "flags": [],
+                    "exceptions": [],
+                    "scan": {
+                        "elapsed": ...,
+                        "scanner": ...,
+                    },
+                },
+                contents,
+            ),
             lambda e, _: mock.ANY if e is ... else e,
         )
     )
@@ -285,19 +249,6 @@ def make_event(
 
 def parse_timestamp(ts: str) -> str:
     return serialize(datetime.fromisoformat(ts), as_json=False)
-
-
-DEFAULT_SCANNER_OPTIONS: Final = {
-    "scanner_timeout": 30,
-}
-
-DEFAULT_BACKEND_CONFIG: Final = {
-    "limits": {
-        "scanner": 30,
-    },
-}
-
-tests_dir: Final = Path(__file__).parent
 
 
 @overload
@@ -495,16 +446,21 @@ def local_fixture(
     @pytest.fixture
     def _local_fixture(
         backend: BaseBackend,
+        request: pytest.FixtureRequest,
         *,
         _name: str | Path = name,
         _enc: FileFixtureEncoding | None = encoding,
         _root: UUID = root,
     ) -> File | str | bytes:
+        #print(request)
+        #print(request.path, request.module)
+        #raise Exception()
         return get_local_fixture(
             backend,
             Path(_name),
             encoding=_enc,
             root=_root,
+            tests_path=Path(request.path).parent,
         )
 
     return _local_fixture
@@ -584,6 +540,7 @@ def get_local_fixture(
     *,
     encoding: None = None,
     root: UUID = NULL_UUID,
+    tests_path: Path = TESTS_DIR,
 ) -> File: ...
 
 
@@ -594,6 +551,7 @@ def get_local_fixture(
     *,
     encoding: Literal["str", "base64", "hex"],
     root: UUID = NULL_UUID,
+    tests_path: Path = TESTS_DIR,
 ) -> str: ...
 
 
@@ -604,6 +562,7 @@ def get_local_fixture(
     *,
     encoding: Literal["bytes"],
     root: UUID = NULL_UUID,
+    tests_path: Path = TESTS_DIR,
 ) -> bytes: ...
 
 
@@ -613,8 +572,9 @@ def get_local_fixture(
     *,
     encoding: FileFixtureEncoding | None = None,
     root: UUID = NULL_UUID,
+    tests_path: Path = TESTS_DIR,
 ) -> File | str | bytes:
-    path = tests_dir / Path(what)
+    path = tests_path / Path(what)
     data = path.read_bytes()
 
     match encoding:
