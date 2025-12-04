@@ -26,7 +26,7 @@ from .indicator import (
     TLSHIndicator,
     URLIndicator,
 )
-from .rule import Rule
+from .rule import Rule, Technique
 from .serialize import serialize
 from .types import (
     AnyPath,
@@ -89,6 +89,7 @@ __all__ = (
     "SHA512Indicator",
     "SsdeepIndicator",
     "TLSHIndicator",
+    "Technique",
     "Tree",
     "URLIndicator",
     "UUID",

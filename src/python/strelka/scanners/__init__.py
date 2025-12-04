@@ -47,6 +47,7 @@ from ..model import (
     Indicator,
     Rule,
     ScannerResults,
+    Technique,
 )
 from ..telemetry.traces import SpanCreatorMixin
 from ..util import ensure_string
@@ -747,11 +748,13 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         id: Any | None = None,
         license: str | None = None,
         provider: str | None = None,
-        reference: str | None = None,
+        reference: Iterable[str] | str | None = None,
         ruleset: str | None = None,
         uuid: Any | None = None,
         version: str | None = None,
         matched: Iterable[Any] = (),
+        tags: Iterable[str] = (),
+        techniques: Iterable[Technique] = (),
     ) -> None: ...
 
     def add_rule_match(
@@ -766,11 +769,13 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
         id: Any | None = None,
         license: str | None = None,
         provider: str | None = None,
-        reference: str | None = None,
+        reference: Iterable[str] | str | None = None,
         ruleset: str | None = None,
         uuid: Any | None = None,
         version: str | None = None,
         matched: Iterable[Any] = (),
+        tags: Iterable[str] = (),
+        techniques: Iterable[Technique] = (),
     ) -> None:
         if not rule_object:
             kwargs = dict(
@@ -794,6 +799,8 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
                                 *(self._parse_indicator(m) for m in matched)
                             )
                         ),
+                        "tags": set(tags),
+                        "techniques": set(techniques),
                     },
                 )
             )

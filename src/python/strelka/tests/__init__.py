@@ -37,6 +37,11 @@ MockAny = EllipsisType
 
 
 TESTS_DIR: Final = Path(__file__).parent
+TECHNIQUE_ID_REGEXES: Final = {
+    "att&ck": re.compile(r"^(TA|T)\d+(\.\d+)?$"),
+    "mbc": re.compile(r"^(OB|OC|B|C|T|E|F)\d+(\..+)?$"),
+}
+TECHNIQUE_REGEX: Final = re.compile(r"^([^:]+(?:::[^:]+?)*)\s*\[([^\]]+)\]$")
 DEFAULT_SCANNER_OPTIONS: Final = {
     "scanner_timeout": 30,
 }
@@ -142,11 +147,34 @@ def make_child(
     }
 
 
-def make_rule(**kwargs) -> dict:
+def make_rule(techniques: Iterable[str | dict] | _MISSING = MISSING, **kwargs) -> dict:
+    if not isinstance(techniques, _MISSING):
+        techniques = list(map(make_technique, techniques))
     return {
         "scanner": ...,
+        **{
+            k: v
+            for k, v in [
+                ("techniques", techniques),
+            ]
+            if v is not MISSING
+        },
         **kwargs,
     }
+
+
+def make_technique(value: str | dict | None = None, /, **kwargs) -> dict:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        if not (m := TECHNIQUE_REGEX.match(value)):
+            raise ValueError(f"unsure how to parse {value!r} as technique")
+        name, tid = m.groups()
+        for source, expr in TECHNIQUE_ID_REGEXES.items():
+            if expr.match(tid):
+                return {"name": name, "id": tid, "source": source}
+        return {"name": name, "id": tid, "source": ...}
+    return {**kwargs}
 
 
 def make_indicator(
