@@ -93,6 +93,7 @@ setuptools = "^75.8.1"
 macaddress = "^2.0.2"
 pydantic = "^2.12.4"
 pyzstd = "^0.18.0"
+cart = "^1.2.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
