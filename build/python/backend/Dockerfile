@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && \
     apt-get install -qq -y --no-install-recommends \
-        automake build-essential ca-certificates cmake curl gcc git dirmngr \
+        autoconf automake build-essential ca-certificates cmake curl gcc git dirmngr \
         gnupg gpg libbz2-dev libgmp-dev libglu1-mesa liblzma-dev libpcap-dev \
         libtool libgomp1 make ncat openssh-client swig pkg-config supervisor \
         yasm zlib1g-dev tini && \
@@ -42,6 +42,32 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -qq -y --no-install-recommends \
         libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev libffi-dev && \
     rm -rf /var/lib/apt/lists/*
+
+# Install libxar; this is a complicated process because Ubuntu pre-25.04 lacks
+# libxar1... Essentially we pull the upstream source and patches from Ubuntu's archives,
+# fudge the autoconf version (because we only have 2.71, not 2.72, neat) and patch out a
+# kernel EXT2 flag that isn't present on 24.04, and only -then- can we build.
+ADD build/python/backend/xar-ext2-no-ecompr.patch /tmp
+RUN mkdir -p /tmp/build-xar && \
+    cd /tmp/build-xar && \
+    mv ../xar-ext2-no-ecompr.patch . && \
+    curl -OL http://archive.ubuntu.com/ubuntu/pool/universe/x/xar/xar_1.8.0.498.orig.tar.gz && \
+    curl -OL http://archive.ubuntu.com/ubuntu/pool/universe/x/xar/xar_1.8.0.498-2.debian.tar.xz && \
+    tar -xf xar_1.8.0.498.orig.tar.gz && \
+    tar -xf xar_1.8.0.498-2.debian.tar.xz && \
+    cd xar-xar-498 && \
+    for patchfile in $(cat ../debian/patches/series); do \
+        patch -Np1 -i ../debian/patches/$patchfile; \
+    done; \
+    patch -Np1 -i ../xar-ext2-no-ecompr.patch && \
+    cd xar && \
+    sed -i 's/AC_PREREQ(\[2.72\])/AC_PREREQ([2.71])/' configure.ac && \
+    autoreconf && \
+    ./configure && \
+    make -sj4 && \
+    make -s install && \
+    cd /tmp && \
+    rm -rf /tmp/build-xar
 
 # Install JTR; this is -very, very slow to build- so do it -as early as
 # possible- so we hopefully don't ever have to redo it. Ever. Please. The
@@ -244,8 +270,7 @@ RUN mkdir -p /tmp/build-capa && \
     deactivate && \
     rm -rf /tmp/build-capa
 
-RUN python3 -m pip install -U pip setuptools && \
-    python3 -m pip install poetry ruamel.yaml rich-argparse semver && \
+RUN python3 -m pip install poetry ruamel.yaml rich-argparse semver && \
     poetry config virtualenvs.create false
 
 # Set the working directory and copy the project files
@@ -254,8 +279,9 @@ ADD ./pyproject.toml ./poetry.lock ./
 
 RUN poetry install --only main
 
-COPY ./src/python/ ./
-RUN python3 setup.py -q build && \
+COPY --chown=$USERNAME:$USERNAME \
+    ./src/python/ ./
+RUN ls -alsF && python3 setup.py -q build && \
     python3 setup.py -q install
 
 USER root
