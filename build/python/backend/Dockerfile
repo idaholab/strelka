@@ -9,6 +9,7 @@ ARG CONFIG_TESTS=false
 ARG TINI_VERSION=0.19.0
 ARG JOHN_VERSION=1.9.1-ce
 ARG YARA_VERSION=4.5.5
+ARG YARA_PYTHON_VERSION=4.5.4
 ARG EXIFTOOL_VERSION=12.60
 
 # Environment variables
@@ -217,9 +218,9 @@ RUN export HOME=/home/$USERNAME && \
 # Install yara-python
 RUN mkdir -p /tmp/build-yara-python && \
     cd /tmp/build-yara-python && \
-    curl -OL https://github.com/VirusTotal/yara-python/archive/v$YARA_VERSION.tar.gz && \
-    tar -xf v$YARA_VERSION.tar.gz && \
-    cd yara-python-$YARA_VERSION && \
+    curl -OL https://github.com/VirusTotal/yara-python/archive/v$YARA_PYTHON_VERSION.tar.gz && \
+    tar -xf v$YARA_PYTHON_VERSION.tar.gz && \
+    cd yara-python-$YARA_PYTHON_VERSION && \
     python3 setup.py build --dynamic-linking && \
     python3 setup.py install && \
     cd /tmp && \
