@@ -20,6 +20,7 @@ from typing import (
 )
 from unittest import TestCase, mock
 from uuid import UUID
+import uuid
 
 import inflection
 import pytest
@@ -480,9 +481,6 @@ def local_fixture(
         _enc: FileFixtureEncoding | None = encoding,
         _root: UUID = root,
     ) -> File | str | bytes:
-        #print(request)
-        #print(request.path, request.module)
-        #raise Exception()
         return get_local_fixture(
             backend,
             Path(_name),
@@ -512,9 +510,11 @@ class ScannerFixtureFactory:
 
 class LocalFileFixtureFactory:
     __root: Path
+    __random_uuid: bool
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, random_uuid: bool = True) -> None:
         self.__root = Path(root)
+        self.__random_uuid = random_uuid
 
     @overload
     def __call__(
@@ -545,8 +545,13 @@ class LocalFileFixtureFactory:
         path: str | Path,
         *,
         encoding: FileFixtureEncoding | None = None,
-        root: UUID = NULL_UUID,
+        root: UUID | _MISSING = MISSING,
     ) -> Callable[..., File | str | bytes]:
+        if not isinstance(root, UUID):
+            if self.__random_uuid:
+                root = uuid.uuid4()
+            else:
+                root = NULL_UUID
         return local_fixture(
             str(self.__root / path),
             encoding=encoding,
@@ -556,7 +561,7 @@ class LocalFileFixtureFactory:
 
 class fixtures:
     scanners: ClassVar = ScannerFixtureFactory()
-    data: ClassVar = LocalFileFixtureFactory("fixtures")
+    data: ClassVar = LocalFileFixtureFactory("fixtures", random_uuid=False)
     helpers: ClassVar = LocalFileFixtureFactory("helpers")
     results: ClassVar = LocalFileFixtureFactory("results")
 

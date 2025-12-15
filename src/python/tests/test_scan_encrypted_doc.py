@@ -6,18 +6,19 @@ data_password_doc = fixtures.data("test_password.doc")
 data_password_docx = fixtures.data("test_password.docx")
 data_password_brute_doc = fixtures.data("test_password_brute.doc")
 data_password_brute_docx = fixtures.data("test_password_brute.docx")
-data_passwords = fixtures.helpers("test_passwords.dat")
+helper_passwords = fixtures.helpers("test_passwords.dat")
 
 
 def test_scan_encrypted_doc(
     scan_encrypted_doc: Scanner,
     data_password_doc: File,
-    data_passwords: File,
+    helper_passwords: File,
 ) -> None:
     """
     Pass:   Sample event matches output of scanner.
     Fail:   Sample event fails to match.
     """
+    assert helper_passwords.path is not None
     test_event = make_event(
         scan={
             "flags": ["cracked_by_wordlist"],
@@ -29,7 +30,7 @@ def test_scan_encrypted_doc(
         fixture=data_password_doc,
         options={
             "log_pws": True,
-            "password_file": data_passwords.name,
+            "password_file": helper_passwords.path,
         },
         expected=test_event,
     )
@@ -38,12 +39,13 @@ def test_scan_encrypted_doc(
 def test_scan_encrypted_docx(
     scan_encrypted_doc: Scanner,
     data_password_docx: File,
-    data_passwords: File,
+    helper_passwords: File,
 ) -> None:
     """
     Pass:   Sample event matches output of scanner.
     Fail:   Sample event fails to match.
     """
+    assert helper_passwords.path is not None
     test_event = make_event(
         scan={
             "flags": ["cracked_by_wordlist"],
@@ -55,7 +57,7 @@ def test_scan_encrypted_docx(
         fixture=data_password_docx,
         options={
             "log_pws": True,
-            "password_file": data_passwords.name,
+            "password_file": helper_passwords.path,
         },
         expected=test_event,
     )
