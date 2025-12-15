@@ -1,10 +1,15 @@
-import glob
 import logging
-import os
+from pathlib import Path
 
 import yara
 
-from . import Scanner
+from . import Options, Scanner
+from ..model import Date, File
+from ..util.files import FileCache
+
+
+class _NotLoaded(Exception):
+    pass
 
 
 class ScanYara(Scanner):
@@ -31,21 +36,12 @@ class ScanYara(Scanner):
             offset match for context
     """
 
+    _rules_cache: FileCache[yara.Rules]
+
     def init(self):
-        """Initializes the ScanYara class.
+        self._rules_cache = FileCache()
 
-        Sets up the initial state for the scanner by ensuring that
-        the compiled YARA rules are not set.
-        """
-        self.compiled_yara = None
-        self.loaded_configs = False
-        self.rules_loaded = 0
-
-        self.warn_user = False
-        self.warned_user = False
-        self.warn_message = ""
-
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at: Date) -> None:
         """Scans the provided data with YARA rules.
 
         Args:
@@ -57,171 +53,199 @@ class ScanYara(Scanner):
         Populates self.event with matches, tags, meta, and hex data
         based on YARA rule matches.
         """
-        # Load YARA rules if not already loaded.
-        # This prevents loading YARA rules on every execution.
-        if not self.compiled_yara:
-            self.load_yara_rules(options)
-            if not self.compiled_yara:
-                self.flags.append("no_rules_loaded")
 
-        # Set the total rules loaded
-        self.event["rules_loaded"] = self.rules_loaded
+        location = Path(options.get("location", "/etc/strelka/yara"))
+        compiled = options.get("compiled", {"enabled": False, "filename": None})
+        use_compiled = compiled.get("enabled", False)
+        compiled_filename = compiled.get("filename", "rules.compiled")
+        rules = None
 
-        # Load YARA configuration options only once.
-        # This prevents loading the configs on every execution.
-        if not self.loaded_configs:
-            self.categories = options.get("categories", {})
-            self.category_key = options.get("category_key", "")
-            self.meta_fields = options.get("meta_fields", [])
-            self.show_all_meta = options.get("show_all_meta", False)
-            self.store_offset = options.get("store_offset", False)
-            self.offset_meta_key = options.get("offset_meta_key", "")
-            self.offset_padding = options.get("offset_padding", 32)
-            self.loaded_configs = True
+        self.event.update(
+            {
+                "matches": set(),
+                "tags": set(),
+                "categories": {},
+                "meta": [],
+                "hex": [],
+            }
+        )
 
-        # Initialize the event data structure.
-        self.hex_dump_cache = {}
-        self.event["matches"] = []
-        self.event["tags"] = []
-        self.event["meta"] = []
-        self.event["hex"] = []
+        if use_compiled:
+            try:
+                rules = self._rules_cache.load(
+                    location / compiled_filename, self.load_yara_rules
+                )
+            except FileNotFoundError:
+                logging.warning(
+                    "Compiled YARA rules do not exist: %s", location / compiled_filename
+                )
+            except _NotLoaded:
+                logging.warning(
+                    "Failed to load compiled YARA rules, trying to compile instead."
+                )
 
-        # Match the data against the YARA rules.
-        if self.compiled_yara:
-            yara_matches = self.compiled_yara.match(data=data)
-            for match in yara_matches:
-                # add the rule and ruleset name to the category meta
-                rule = {
-                    "name": match.rule,
-                    "ruleset": match.namespace,
-                }
-                # include meta if its in the meta_fields list
-                for k, v in match.meta.items():
-                    if k.lower() in self.meta_fields:
-                        rule.update({k.lower(): v})
-                for category, params in self.categories.items():
-                    if not self.event.get(category):
-                        self.event[category] = []
-                    # check if the category matches the category_key
-                    if category in match.meta.get(self.category_key, "").lower():
-                        # show meta for specific category if enabled
-                        if params.get("show_meta", False):
-                            self.event[category].append(rule)
-                        else:
-                            self.event[category].append(match.rule)
-                    # show meta for specific tag if present
-                    # if category in list(map(str.lower, match.tags)):
-                    #     self.event[category].append(rule)
+        if not rules:
+            try:
+                rules = self._rules_cache.load(location, self.compile_yara_rules)
+            except FileNotFoundError:
+                logging.error("YARA rules do not exist: %s", location)
+                self.fail("no_rules_loaded")
+            except _NotLoaded:
+                logging.error("Failed to compile YARA rules, unable to scan.")
+                self.fail("no_rules_loaded", None)
 
-                # Append rule matches and update tags.
-                self.event["matches"].append(match.rule)
-                self.event["tags"].extend(match.tags)
+        if len(list(rules)) == 0:
+            self.fail("empty_rules")
 
-                # Extract hex representation if configured to store offsets.
-                if self.store_offset and self.offset_meta_key:
-                    if match.meta.get(self.offset_meta_key):
-                        for string_data in match.strings:
-                            for instance in string_data.instances:
-                                offset = instance.offset
-                                matched_string = instance.matched_data
-                                self.extract_match_hex(
-                                    match.rule,
-                                    offset,
-                                    matched_string,
-                                    data,
-                                    self.offset_padding,
-                                )
+        hex_dump_cache = {}
+        categories = options.get("categories", {})
+        category_key = options.get("category_key", "")
+        meta_fields = options.get("meta_fields", [])
+        show_all_meta = options.get("show_all_meta", False)
+        store_offset = options.get("store_offset", False)
+        offset_meta_key = options.get("offset_meta_key", "")
+        offset_padding = options.get("offset_padding", 32)
 
-                # Append meta information if configured to do so
-                if self.show_all_meta:
-                    for k, v in match.meta.items():
-                        self.event["meta"].append(
-                            {"rule": match.rule, "identifier": k, "value": v}
+        yara_matches = rules.match(data=data)
+        for match in yara_matches:
+            # add the rule and ruleset name to the category meta
+            rule = {
+                "name": match.rule,
+                "ruleset": match.namespace,
+            }
+            # include meta if its in the meta_fields list
+            for k, v in match.meta.items():
+                if k.lower() in meta_fields:
+                    rule.update({k.lower(): v})
+            for category, params in categories.items():
+                cat_matches = self.event["categories"].setdefault(category, [])
+                # check if the category matches the category_key
+                if category in match.meta.get(category_key, "").lower():
+                    # show meta for specific category if enabled
+                    if params.get("show_meta", False):
+                        cat_matches.append(rule)
+                    else:
+                        cat_matches.append(match.rule)
+                # show meta for specific tag if present
+                # if category in list(map(str.lower, match.tags)):
+                #     self.event[category].append(rule)
+
+            # Append rule matches and update tags.
+            self.event["matches"].add(match.rule)
+            self.event["tags"].update(match.tags)
+
+            # Extract hex representation if configured to store offsets.
+            if store_offset and offset_meta_key:
+                if match.meta.get(offset_meta_key):
+                    for string_data in match.strings:
+                        self.event["hex"].extend(
+                            self.extract_match_hex(
+                                match.rule,
+                                instance.offset,
+                                instance.matched_data,
+                                data,
+                                offset_padding,
+                                hex_dump_cache,
+                            )
+                            for instance in string_data.instances
                         )
 
-            # De-duplicate tags.
-            self.event["tags"] = list(set(self.event["tags"]))
-
-    def load_yara_rules(self, options):
-        """Loads YARA rules based on the provided path.
-
-        Args:
-            options (dict): Configuration options specifying the
-            location of YARA rules.
-
-        Loads a compiled YARA ruleset or compiles YARA rules either
-        from a specified file or from a directory. If there's an issue
-        with compilation, flags are set to indicate any
-        compilation / loading errors.
-        """
-        # Retrieve location of YARA rules.
-        location = options.get("location", "/etc/strelka/yara/")
-        compiled = options.get("compiled", {"enabled": False})
-
-        try:
-            # Load compiled YARA rules from a file.
-            if compiled.get("enabled", False):
-                self.compiled_yara = yara.load(
-                    os.path.join(location, compiled.get("filename", "rules.compiled"))
-                )
-        except yara.Error as e:
-            self.flags.append(f"compiled_load_error_{e}")
-            self.warn_user = True
-
-        try:
-            # Compile YARA rules from a directory.
-            if not self.compiled_yara:
-                if os.path.isdir(location):
-                    globbed_yara_paths = glob.iglob(
-                        f"{location}/**/*.yar*", recursive=True
-                    )
-                    if not globbed_yara_paths:
-                        self.flags.append("yara_rules_not_found")
-                    yara_filepaths = {
-                        f"namespace_{i}": entry
-                        for (i, entry) in enumerate(globbed_yara_paths)
+            # Append meta information if configured to do so
+            if show_all_meta:
+                self.event["meta"].extend(
+                    {
+                        "rule": match.rule,
+                        "identifier": k,
+                        "value": v,
                     }
-                    self.compiled_yara = yara.compile(filepaths=yara_filepaths)
-                # Compile YARA rules from a single file.
-                elif os.path.isfile(location):
-                    self.compiled_yara = yara.compile(filepath=location)
-                else:
-                    self.flags.append("yara_location_not_found")
-                    self.warn_user = True
-                    self.warn_message = "YARA Location Not Found"
-
-        except yara.SyntaxError as e:
-            self.flags.append(f"compiling_error_syntax_{e}")
-            self.warn_user = True
-            self.warn_message = str(e)
-
-        except yara.Error as e:
-            self.flags.append(f"compiling_error_general_{e}")
-            self.warn_user = True
-            self.warn_message = str(e)
-
-        # Set the total rules loaded.
-        if self.compiled_yara:
-            self.rules_loaded = len(list(self.compiled_yara))
-
-        if not self.compiled_yara:
-            if not self.warned_user and self.warn_user:
-                logging.warning(
-                    "\n"
-                    "*************************************************\n"
-                    "* WARNING: YARA File Loading Issue Detected     *\n"
-                    "*************************************************\n"
-                    "There was an issue loading the compiled YARA file. Please check that all YARA rules can be\n"
-                    "successfully compiled. Additionally, verify the 'ScanYara' configuration in Backend.yaml to\n"
-                    "ensure the targeted path is correct. This issue needs to be resolved for proper scanning\n"
-                    "functionality.\n"
-                    "\n"
-                    f"Error: {self.warn_message}\n"
-                    "*************************************************\n"
+                    for k, v in match.meta.items()
                 )
-                self.warned_user = True
 
-    def extract_match_hex(self, rule, offset, matched_string, data, offset_padding=32):
+    def load_yara_rules(self, path: Path) -> yara.Rules:
+        try:
+            return yara.load(path)
+        except yara.Error:
+            self.add_flag("load_error")
+            logging.exception("Failed to load compiled YARA rules from: %s", path)
+        raise _NotLoaded
+
+    def compile_yara_rules(self, path: Path) -> yara.Rules:
+        try:
+            if path.is_dir():
+                return yara.compile(
+                    filepaths={
+                        f"namespace{i}": str(entry)
+                        for i, entry in enumerate(path.glob("**/*.yar*"))
+                    },
+                )
+            elif path.is_file():
+                return yara.compile(filepath=str(path))
+            else:
+                self.add_flag("missing_rules")
+                logging.warning("YARA rules do not exist: %s", path)
+        except yara.SyntaxError:
+            self.add_flag("syntax_error")
+            logging.exception("Syntax error in YARA rules at: %s", path)
+        except yara.Error:
+            self.add_flag("compile_error")
+            logging.exception("Failed to compile YARA rules from: %s", path)
+        raise _NotLoaded
+
+        # if path.is_dir():
+        #            globbed_yara_paths = glob.iglob(
+        #                f"{location}/**/*.yar*", recursive=True
+        #            )
+        #            if not globbed_yara_paths:
+        #                self.flags.append("yara_rules_not_found")
+        #            yara_filepaths = {
+        #                f"namespace_{i}": entry
+        #                for (i, entry) in enumerate(globbed_yara_paths)
+        #            }
+        #            self.compiled_yara = yara.compile(filepaths=yara_filepaths)
+        #        # Compile YARA rules from a single file.
+        #        elif os.path.isfile(location):
+        #            self.compiled_yara = yara.compile(filepath=location)
+        #        else:
+        #            self.flags.append("yara_location_not_found")
+        #            self.warn_user = True
+        #            self.warn_message = "YARA Location Not Found"
+        # except yara.SyntaxError as e:
+        #    self.flags.append(f"compiling_error_syntax_{e}")
+        #    self.warn_user = True
+        #    self.warn_message = str(e)
+        # except yara.Error as e:
+        #    self.flags.append(f"compiling_error_general_{e}")
+        #    self.warn_user = True
+        #    self.warn_message = str(e)
+        ## Set the total rules loaded.
+        # if self.compiled_yara:
+        #    self.rules_loaded = len(list(self.compiled_yara))
+        # if not self.compiled_yara:
+        #    if not self.warned_user and self.warn_user:
+        #        logging.warning(
+        #            "\n"
+        #            "*************************************************\n"
+        #            "* WARNING: YARA File Loading Issue Detected     *\n"
+        #            "*************************************************\n"
+        #            "There was an issue loading the compiled YARA file. Please check that all YARA rules can be\n"
+        #            "successfully compiled. Additionally, verify the 'ScanYara' configuration in Backend.yaml to\n"
+        #            "ensure the targeted path is correct. This issue needs to be resolved for proper scanning\n"
+        #            "functionality.\n"
+        #            "\n"
+        #            f"Error: {self.warn_message}\n"
+        #            "*************************************************\n"
+        #        )
+        #        self.warned_user = True
+
+    def extract_match_hex(
+        self,
+        rule: str,
+        offset: int,
+        matched_string: str,
+        data: bytes,
+        offset_padding: int = 32,
+        cache: dict[int, tuple[str, str]] | None = None,
+    ) -> dict:
         """
         Extracts a hex dump of a matched string in the data, with padding.
 
@@ -234,53 +258,60 @@ class ScanYara(Scanner):
         bounds.
 
         Args:
-        - rule (str): Name of the YARA rule that triggered the match.
-        - offset (int): Start offset of the matched string in the data.
-        - matched_string (str): The actual string in the data that matched the YARA rule.
-        - data (bytes): The file data being scanned.
+        - rule (str): Name of the YARA rule that triggered the match
+        - offset (int): Start offset of the matched string in the data
+        - matched_string (str): The actual string in the data that matched the YARA rule
+        - data (bytes): The file data being scanned
         - offset_padding (int, optional): Total number of bytes to include as padding
+        - cache (dict, optional): Cache for the current scan
         around the matched string in the hex dump. Defaults to 32.
 
         Returns:
-        - Appends a dictionary containing the rule name and hex dump to self.event["hex"].
+        - A dictionary containing the rule name and hex dump.
         """
 
-        # Calculate half of the total padding to distribute evenly on either side of the match.
-        # This is to add context to the match. It's recommended to keep this low (16 bytes)
+        cache = cache or {}
+
+        # Calculate half of the total padding to distribute evenly on either side of the
+        # match to add context. It's recommended to keep this low (16 bytes).
         half_padding = offset_padding // 2
 
-        # Determine the starting and ending offsets for the hex dump, ensuring we stay within data bounds.
+        # Determine the starting and ending offsets for the hex dump, ensuring we stay
+        # within data bounds.
         start_offset = max(offset - half_padding, 0)
         end_offset = min(offset + len(matched_string) + half_padding, len(data))
 
         # Create a list to store the hex representation lines
         hex_lines = []
 
-        # Loop through the specified data range in 16-byte chunks to generate the hex dump
+        # Loop through the data range in 16-byte chunks to generate the hex dump
         for i in range(start_offset, end_offset, 16):
-            # If this chunk hasn't been processed before, generate its hex and ASCII representations
-            if i not in self.hex_dump_cache:
+            # If this chunk hasn't been processed before, generate its representations
+            if i not in cache:
                 chunk = data[i : i + 16]
 
-                # Convert each byte in the chunk to its hexadecimal representation and join them with spaces.
+                # Convert each byte in the chunk to its hexadecimal representation and
+                # join them with spaces.
                 # E.g., a chunk [65, 66, 67] would become the string "41 42 43"
                 hex_values = " ".join([f"{byte:02x}" for byte in chunk])
 
                 # Generate an ASCII representation for each byte in the chunk:
-                # - Use the character itself if it's a printable ASCII character (between 32 and 126 inclusive).
+                # - Use the character itself if it's a printable ASCII character
+                #   (between 32 and 126 inclusive).
                 # - Replace non-printable characters with a period ('.').
                 # E.g., a chunk [65, 66, 0] would become the string "AB."
                 ascii_values = "".join(
                     [chr(byte) if 32 <= byte <= 126 else "." for byte in chunk]
                 )
 
-                # Cache the generated hex and ASCII values to avoid redundant computation in the future
-                self.hex_dump_cache[i] = (hex_values, ascii_values)
+                # Cache the generated hex and ASCII values to avoid redundant
+                # computation in the future
+                cache[i] = (hex_values, ascii_values)
             else:
-                hex_values, ascii_values = self.hex_dump_cache[i]
+                hex_values, ascii_values = cache[i]
 
             # Generate a formatted string for this chunk and add to our hex_lines list
             hex_lines.append(f"{i:08x}  {hex_values:<47}  {ascii_values}")
 
         # Append the generated hex dump and rule information to the event
-        self.event["hex"].append({"rule": rule, "dump": hex_lines})
+        return {"rule": rule, "dump": hex_lines}
