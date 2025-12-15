@@ -3014,6 +3014,26 @@ files = [
 ]
 
 [[package]]
+name = "python-msi"
+version = "0.0.0a3"
+description = "A pure Python library for reading and manipulating Windows Installer (MSI) files. Based on the rust msi crate and msitools utilities"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "python_msi-0.0.0a3-py3-none-any.whl", hash = "sha256:8f2e81e6659caa02a7c0858105c360c1cb7ca0a7e38e1be09feb836b49d22fe9"},
+    {file = "python_msi-0.0.0a3.tar.gz", hash = "sha256:cadb76a4f578b085aaea85e405ed921d35a4fbf1a2da7d87edde333ac49b0b5d"},
+]
+
+[package.dependencies]
+olefile = "*"
+
+[package.extras]
+dev = ["build", "pre-commit"]
+docs = ["myst-parser", "sphinx"]
+test = ["pytest"]
+
+[[package]]
 name = "pytz"
 version = "2024.1"
 description = "World timezone definitions, modern and historical"
@@ -4110,4 +4130,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<=3.12"
-content-hash = "5dd06d5baae92e6fdefdd662508215feeac392625c2fc5b1cf34edf8c896b7a3"
+content-hash = "e76147c2a9a2c34679bed5045b0df504503995caf409e70414e112cc85501c27"

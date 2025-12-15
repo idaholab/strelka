@@ -2,12 +2,12 @@ import re
 
 import bs4  # type: ignore
 
-from strelka import strelka
+from . import File, Options, Scanner
 
 base64Re = re.compile("^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$")
 
 
-class ScanHtml(strelka.Scanner):
+class ScanHtml(Scanner):
     """Collects metadata and extracts embedded scripts from HTML files.
 
     Options:
@@ -15,7 +15,7 @@ class ScanHtml(strelka.Scanner):
             Defaults to 'html.parser'.
     """
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at) -> None:
         parser = options.get("parser", "html.parser")
         max_hyperlinks = options.get("max_hyperlinks", 50)
 
