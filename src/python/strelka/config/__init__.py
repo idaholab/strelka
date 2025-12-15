@@ -9,6 +9,7 @@ from typing import Any, Iterable, Iterator, Mapping, MutableMapping, overload
 
 import yaml
 
+from ..util import _MISSING
 from ..util.collections import get_nested, merge, pop_nested, set_nested
 
 
@@ -70,6 +71,22 @@ class BackendConfig(MutableMapping):
     def update_if_missing(self, what: OptionsItems) -> None:
         self.dictionary = dict(merge(dict(what), self.dictionary))
         self._hash_config()
+
+    def options_for_scanner(
+        self,
+        scanner: str,
+        *options: Mapping[str, Any] | _MISSING,
+        **kwargs,
+    ) -> Mapping[str, Any]:
+        return merge(
+            # global, scanner-independent options
+            self.get("options.global", {}),
+            # global, rule-independent scanner options
+            self.get(f"options.{scanner}", {}),
+            # additional, explicit options
+            *options,
+            kwargs,
+        )
 
     def __getitem__(self, path: str) -> Any:
         value = get_nested(self.dictionary, path, ...)

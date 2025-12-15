@@ -15,12 +15,15 @@ RUN go mod download && \
 
 # Initialize runtime container with non-root user
 FROM alpine
-USER 1001
 LABEL maintainer="Target Brands, Inc. TTS-CFC-OpenSource@target.com"
+
+RUN apk add tini
+
+USER 1001
 
 # Copy binary to /usr/local/bin
 COPY --from=build /tmp/strelka-manager /usr/local/bin/strelka-manager
 
-# Set container entrypoint. This could be set/overridden elsewhere in deployment (e.g. k8s, docker-compose, etc.)
-# Currently overwritten in ./build/docker-compose.yml
-ENTRYPOINT ["strelka-manager"]
+# Set container entrypoint and command; these could be set/overridden elsewhere in deployment (e.g. k8s, docker-compose, etc.)
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["strelka-manager"]

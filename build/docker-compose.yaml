@@ -11,7 +11,6 @@ services:
     build:
       context: ..
       dockerfile: build/go/frontend/Dockerfile
-    command: strelka-frontend -locallog=true -kafkalog=false
     ports:
       - 57314:57314  # must match the port in frontend.yaml
     networks:
@@ -28,7 +27,6 @@ services:
     build:
       context: ..
       dockerfile: build/python/backend/Dockerfile
-    command: strelka-backend
     shm_size: 512mb  # increase as necessary, required for some scanners
     networks:
       - net
@@ -46,7 +44,6 @@ services:
     build:
       context: ..
       dockerfile: build/go/manager/Dockerfile
-    command: strelka-manager
     restart: unless-stopped
     networks:
       - net

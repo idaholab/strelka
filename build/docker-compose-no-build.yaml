@@ -9,7 +9,6 @@ volumes:
 services:
   frontend:
     image: target/strelka-frontend:latest
-    command: strelka-frontend
     pull_policy: always
     ports:
       - 57314:57314  # must match the port in frontend.yaml
@@ -25,7 +24,6 @@ services:
 
   backend:
     image: target/strelka-backend:latest
-    command: strelka-backend
     pull_policy: always
     shm_size: 512mb  # increase as necessary, required for some scanners
     networks:
@@ -42,7 +40,6 @@ services:
 
   manager:
     image: target/strelka-manager:latest
-    command: strelka-manager
     restart: unless-stopped
     networks:
       - net
