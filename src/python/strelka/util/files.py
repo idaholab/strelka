@@ -6,7 +6,8 @@ import os
 from os import PathLike
 from pathlib import Path
 import shutil
-from typing import Iterator
+from typing import Callable, Generic, Iterator, TypeVar
+from datetime import datetime, UTC, timedelta
 
 from . import ensure_string
 
@@ -16,6 +17,48 @@ __all__ = (
     "safe_join_path",
     "find_executable",
 )
+
+
+_T = TypeVar("_T")
+
+
+class FileCache(Generic[_T]):
+    expire_after: timedelta | None
+
+    _cache: dict[Path, tuple[datetime, _T]]
+
+    def __init__(self, expire_after: timedelta | None = None) -> None:
+        self.expire_after = expire_after
+        self._cache = {}
+
+    def load(self, path: Path, loader: Callable[[Path], _T]) -> _T:
+        if not path.exists():
+            raise FileNotFoundError(path)
+
+        key = path.resolve()
+
+        if path.is_dir():
+            mtime = datetime.min
+            for child in path.rglob("*"):
+                if child.is_dir():
+                    continue
+                stat = child.stat()
+                mtime = max(mtime, datetime.fromtimestamp(stat.st_mtime, UTC))
+        else:
+            stat = path.stat()
+            mtime = datetime.fromtimestamp(stat.st_mtime, UTC)
+
+        now = datetime.now(UTC)
+
+        (ts, result) = self._cache.get(key, (datetime.min, None))
+        if result is not None:
+            if ((e := self.expire_after) and (now - ts) > e) or (mtime >= ts):
+                self._cache.pop(key)
+            else:
+                return result
+
+        self._cache[key] = (ts, (result := loader(path)))
+        return result
 
 
 # this is a contextmanager because -technically-, even though `Traversable`
