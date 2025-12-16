@@ -234,7 +234,7 @@ RUN export HOME=/home/$USERNAME && \
     curl -fsSL https://pyenv.run | bash
 
 ENV PYENV_ROOT=/home/$USERNAME/.pyenv
-ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims
+ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims:$PATH
 
 RUN export HOME=/home/$USERNAME && \
     pyenv install 3.11 && \
