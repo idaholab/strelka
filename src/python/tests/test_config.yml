@@ -1,0 +1,8 @@
+testing:
+  options:
+    ScanDmg:
+      7zz: ~/Downloads/7z-2409/7zz
+    ScanCapa:
+      rules_dir: ~/Projects/pipeline/strelka/configs/capa-rules-9.3.1
+      signatures_dir: ~/Projects/pipeline/strelka/configs/capa/sigs
+      capa: ~/Projects/capa-venv/bin/capa

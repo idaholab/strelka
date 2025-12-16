@@ -61,7 +61,7 @@ class EUI48(macaddress.EUI48):
         return self._address.to_bytes(self.size >> 3).hex(":")
 
 
-def _ensure_list(value: _T | Iterable[_T]) -> List[_T]:
+def _validate_ensure_list(value: _T | Iterable[_T]) -> List[_T]:
     if isinstance(value, (str, bytes)):
         return [cast(_T, value)]
     elif isinstance(value, Iterable):
@@ -70,13 +70,20 @@ def _ensure_list(value: _T | Iterable[_T]) -> List[_T]:
         return [value]
 
 
-def _ensure_set(value: _T | Iterable[_T]) -> Set[_T]:
+def _validate_ensure_set(value: _T | Iterable[_T]) -> Set[_T]:
     if isinstance(value, (str, bytes)):
         return {cast(_T, value)}
     elif isinstance(value, Iterable):
         return {*value}
     else:
         return {value}
+
+
+def _serialize_ensure_set(value: Iterable[_T]) -> List[_T]:
+    try:
+        return sorted(value)  # type: ignore
+    except TypeError:
+        return list(value)
 
 
 def _scanner_key(value: Any) -> str:
@@ -97,13 +104,20 @@ AnyPath = PurePath | PurePosixPath | PureWindowsPath
 Date = datetime.datetime
 Duration = datetime.timedelta
 Elapsed = Duration
-EnsureList = Annotated[List[_T], PlainValidator(_ensure_list)]
-EnsureSet = Annotated[Set[_T], PlainValidator(_ensure_set)]
+EnsureList = Annotated[
+    List[_T],
+    PlainValidator(_validate_ensure_list),
+]
+EnsureSet = Annotated[
+    Set[_T],
+    PlainValidator(_validate_ensure_set),
+    PlainSerializer(_serialize_ensure_set),
+]
 MACAddress = EUI48
 Octal = Annotated[
     int,
     PlainSerializer(lambda v: f"0{v:o}"),
-    PlainValidator(lambda v: int(v, 8)),
+    PlainValidator(lambda v: v if isinstance(v, int) else int(v, 8)),
 ]
 ScannerKey = Annotated[str, PlainValidator(_scanner_key)]
 UUID = uuid.UUID

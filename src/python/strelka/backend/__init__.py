@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 import importlib
 import logging
 import os
-import pathlib
+from pathlib import Path
 import re
 import string
 from typing import Final, Iterator, Optional, TypedDict
@@ -19,6 +19,7 @@ from ..exceptions import DistributionTimeout
 from ..model import Date, Event, File
 from ..scanners import Scanner
 from ..telemetry.traces import SpanCreatorMixin, get_tracer
+from ..util.files import FileCache
 from ..util.timeout import timeout_after
 from .task import Task
 
@@ -39,7 +40,7 @@ class BaseBackend(SpanCreatorMixin, metaclass=ABCMeta):
     tracer: trace.Tracer
 
     compiled_magic: magic.Magic
-    compiled_taste_yara: yara.YARA
+    yara_rules_cache: FileCache[yara.Rules]
 
     def __init__(
         self,
@@ -68,25 +69,20 @@ class BaseBackend(SpanCreatorMixin, metaclass=ABCMeta):
             magic_db = None
         self.compiled_magic = magic.Magic(magic_file=magic_db, mime=True)
 
-        # try to compile our yara tasting rules
-        yara_rules = pathlib.Path(
-            self.config.get("tasting.yara_rules", "/etc/strelka/taste"),
-        )
-        if yara_rules.is_dir():
-            self.compiled_taste_yara = yara.compile(
+    @staticmethod
+    def _compile_yara_rules(path: Path) -> yara.Rules:
+        if path.is_dir():
+            return yara.compile(
                 filepaths={
                     f"namespace{i}": str(entry)
-                    for i, entry in enumerate(yara_rules.glob("**/*.yar*"))
+                    for i, entry in enumerate(path.glob("**/*.yar*"))
                 },
             )
-        elif os.path.isfile(yara_rules):
-            self.compiled_taste_yara = yara.compile(filepath=str(yara_rules))
+        elif path.is_file():
+            return yara.compile(filepath=str(path))
         else:
-            logging.warning(
-                "YARA tasting rules do not exist: %s",
-                yara_rules,
-            )
-            self.compiled_taste_yara = yara.compile(source="")
+            logging.warning("YARA rules do not exist: %s", path)
+            return yara.compile(source="")
 
     def taste_mime(self, data: bytes) -> Iterator[str]:
         """Tastes file data with libmagic."""
@@ -101,7 +97,11 @@ class BaseBackend(SpanCreatorMixin, metaclass=ABCMeta):
         """Tastes file data with YARA."""
 
         # yield any matching rules for the data as-is
-        for match in self.compiled_taste_yara.match(data=data):
+        rules = self.yara_rules_cache.load(
+            Path(self.config.get("tasting.yara_rules", "/etc/strelka/taste")),
+            self._compile_yara_rules,
+        )
+        for match in rules.match(data=data):
             yield match.rule
         # then, if the data starts with any whitespace, yield any matches with
         # that whitespace removed; because the recursive call won't have any

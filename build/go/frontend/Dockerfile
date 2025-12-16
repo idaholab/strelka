@@ -19,7 +19,7 @@ RUN go mod download && \
 FROM alpine
 LABEL maintainer="Target Brands, Inc. TTS-CFC-OpenSource@target.com"
 
-RUN apk add librdkafka
+RUN apk add librdkafka tini
 
 # Copy binary
 COPY --from=build /tmp/strelka-frontend /usr/local/bin/strelka-frontend
@@ -34,6 +34,6 @@ RUN mkdir /var/log/strelka/ && \
 RUN touch /var/log/strelka/strelka.log
 RUN chmod -R 777 /var/log/strelka/strelka.log
 
-# Set container entrypoint. This could be set/overridden elsewhere in deployment (e.g. k8s, docker-compose, etc.)
-# Currently overwritten in ./build/docker-compose.yml
-ENTRYPOINT ["strelka-frontend", "-locallog=true", "-kafkalog=false"]
+# Set container entrypoint/command; these could be set/overridden elsewhere in deployment (e.g. k8s, docker-compose, etc.)
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["strelka-frontend", "-locallog=true", "-kafkalog=false"]

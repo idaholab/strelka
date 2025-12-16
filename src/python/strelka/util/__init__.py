@@ -1,5 +1,6 @@
 from __future__ import annotations
 import datetime
+import os
 from typing import Any, Final, Iterator, Type, overload
 
 import inflection
@@ -39,6 +40,14 @@ def unquote(data: str, ends: str) -> str:
         ends = ends * 2
     b, e = ends
     return data.removeprefix(b).removesuffix(e)
+
+
+def ensure_string(what: Any) -> str:
+    if isinstance(what, os.PathLike):
+        what = os.fspath(what)
+    if isinstance(what, bytes):
+        what = what.decode()
+    return str(what)
 
 
 @overload
