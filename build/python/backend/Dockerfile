@@ -269,9 +269,16 @@ RUN mkdir -p /tmp/build-capa && \
     python3 ./scripts/cache-ruleset.py rules/ cache && \
     pyinstaller ./.github/pyinstaller/pyinstaller.spec && \
     chmod 755 ./dist/capa && \
-    mv ./dist/capa /usr/bin/ && \
+    mv ./dist/capa /tmp/capa && \
     deactivate && \
     rm -rf /tmp/build-capa
+
+USER root
+
+RUN mv /tmp/capa /usr/bin/ && \
+    chown root:root /usr/bin/capa
+
+USER $USERNAME
 
 RUN python3 -m pip install poetry ruamel.yaml rich-argparse semver && \
     poetry config virtualenvs.create false
