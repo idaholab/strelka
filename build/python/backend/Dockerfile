@@ -62,8 +62,11 @@ RUN mkdir -p /tmp/build-xar && \
     done; \
     patch -Np1 -i ../xar-ext2-no-ecompr.patch && \
     cd xar && \
+    curl -fsSL https://git.savannah.gnu.org/cgit/config.git/plain/config.guess -o config.guess && \
+    curl -fsSL https://git.savannah.gnu.org/cgit/config.git/plain/config.sub   -o config.sub && \
+    chmod +x config.guess config.sub && \
     sed -i 's/AC_PREREQ(\[2.72\])/AC_PREREQ([2.71])/' configure.ac && \
-    autoreconf && \
+    autoreconf -fi && \
     ./configure && \
     make -sj4 && \
     make -s install && \
@@ -118,7 +121,7 @@ RUN mkdir -p /tmp/install-7z && \
     cd /tmp/install-7z && \
     curl -OL https://7-zip.org/a/7z2409-linux-x64.tar.xz && \
     tar -xf 7z2409-linux-x64.tar.xz && \
-    cp 7zz /usr/local/bin && \
+    cp 7zz /usr/bin/ && \
     cd /tmp && \
     rm -rf /tmp/install-7z
 
@@ -155,7 +158,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
             | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
         apt-get -qq update && \
         apt-get install -qq -y --no-install-recommends zeek-lts && \
-        cp /opt/zeek/bin/zeek /bin/zeek && \
+        cp /opt/zeek/bin/zeek /usr/bin/ && \
         rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
         rm -rf /opt/zeek/lib/*.a && \
         rm -rf /var/lib/apt/lists/*; \
@@ -228,11 +231,10 @@ RUN mkdir /var/log/strelka/ && \
 USER $USERNAME
 
 RUN export HOME=/home/$USERNAME && \
-    curl -fsSL https://pyenv.run | bash && \
-    mkdir -p $HOME/.local/bin
+    curl -fsSL https://pyenv.run | bash
 
 ENV PYENV_ROOT=/home/$USERNAME/.pyenv
-ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims:/home/$USERNAME/.local/bin:$PATH
+ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims
 
 RUN export HOME=/home/$USERNAME && \
     pyenv install 3.11 && \
@@ -267,7 +269,7 @@ RUN mkdir -p /tmp/build-capa && \
     python3 ./scripts/cache-ruleset.py rules/ cache && \
     pyinstaller ./.github/pyinstaller/pyinstaller.spec && \
     chmod 755 ./dist/capa && \
-    mv ./dist/capa /home/$USERNAME/.local/bin/capa && \
+    mv ./dist/capa /usr/bin/ && \
     deactivate && \
     rm -rf /tmp/build-capa
 
