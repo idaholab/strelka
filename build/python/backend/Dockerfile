@@ -32,16 +32,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -qq -y --no-install-recommends \
         autoconf automake build-essential ca-certificates cmake curl gcc git dirmngr \
         gnupg gpg libbz2-dev libgmp-dev libglu1-mesa liblzma-dev libpcap-dev \
+        libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev \
+        libffi-dev libreadline-dev libsqlite3-dev libncurses-dev \
         libtool libgomp1 make ncat openssh-client swig pkg-config supervisor \
         yasm zlib1g-dev tini && \
     cpan -i Compress::Raw::Lzma && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-        libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Install libxar; this is a complicated process because Ubuntu pre-25.04 lacks

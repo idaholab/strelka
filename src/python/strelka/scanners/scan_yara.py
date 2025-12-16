@@ -163,7 +163,7 @@ class ScanYara(Scanner):
 
     def load_yara_rules(self, path: Path) -> yara.Rules:
         try:
-            return yara.load(path)
+            return yara.load(str(path))
         except yara.Error:
             self.add_flag("load_error")
             logging.exception("Failed to load compiled YARA rules from: %s", path)

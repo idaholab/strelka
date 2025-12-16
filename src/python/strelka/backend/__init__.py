@@ -49,6 +49,7 @@ class BaseBackend(SpanCreatorMixin, metaclass=ABCMeta):
         self.scanner_cache = {}
         self.config = config
         self.coordinator = None
+        self.yara_rules_cache = FileCache()
 
         # create a tracer using the parameters in the config file
         self.tracer = get_tracer(

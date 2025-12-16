@@ -7,7 +7,7 @@ from os import PathLike
 from pathlib import Path
 import shutil
 from typing import Callable, Generic, Iterator, TypeVar
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, UTC, timedelta, timezone
 
 from . import ensure_string
 
@@ -38,7 +38,7 @@ class FileCache(Generic[_T]):
         key = path.resolve()
 
         if path.is_dir():
-            mtime = datetime.min
+            mtime = datetime.min.replace(tzinfo=UTC)
             for child in path.rglob("*"):
                 if child.is_dir():
                     continue
@@ -50,7 +50,7 @@ class FileCache(Generic[_T]):
 
         now = datetime.now(UTC)
 
-        (ts, result) = self._cache.get(key, (datetime.min, None))
+        (ts, result) = self._cache.get(key, (datetime.min.replace(tzinfo=UTC), None))
         if result is not None:
             if ((e := self.expire_after) and (now - ts) > e) or (mtime >= ts):
                 self._cache.pop(key)
