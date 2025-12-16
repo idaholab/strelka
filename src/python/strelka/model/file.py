@@ -76,7 +76,13 @@ class Hash(Model, frozen=True):
             for h in hashes.values():
                 h.update(block)
 
-        hashes["tlsh"].final()
+        # Safely finalize TLSH
+        try:
+            hashes["tlsh"].final()
+            tlsh_digest = hashes["tlsh"].hexdigest()
+        except ValueError:
+            # Data too short for TLSH
+            tlsh_digest = None
 
         return cls(
             md5=hashes["md5"].hexdigest(),
@@ -85,7 +91,7 @@ class Hash(Model, frozen=True):
             sha384=hashes["sha384"].hexdigest(),
             sha512=hashes["sha512"].hexdigest(),
             ssdeep=hashes["ssdeep"].digest(),
-            tlsh=hashes["tlsh"].hexdigest(),
+            tlsh=tlsh_digest,
         )
 
 
