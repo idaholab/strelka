@@ -5,7 +5,7 @@ import pillow_avif
 from PIL import Image, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 
-from . import Scanner
+from . import File, Options, Scanner
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
 
@@ -35,20 +35,19 @@ class ScanTranscode(Scanner):
         - [Sara Kalupa](https://github.com/skalupa)
     """
 
-    def scan(self, data, file, options, expire_at):
+    def scan(self, data: bytes, file: File, options: Options, expire_at) -> None:
         output_format = options.get("output_format", "jpeg")
 
         def convert(im):
             with io.BytesIO() as f:
-                if "image/x-icon" in file.flavors.get(
-                    "mime", []
-                ) or "image/vnd.microsoft.icon" in file.flavors.get("mime", []):
-                    rgba_im = im.convert("RGBA")
-                    rgba_im.save(f, format=f"{output_format}", quality=90)
-                    return f.getvalue()
-                else:
-                    im.save(f, format=f"{output_format}", quality=90)
-                    return f.getvalue()
+                fmt = output_format.lower()
+
+                # JPEG cannot handle alpha channels
+                if fmt in ("jpg", "jpeg") and im.mode in ("RGBA", "LA", "P"):
+                    im = im.convert("RGB")
+
+                im.save(f, format=output_format, quality=90)
+                return f.getvalue()
 
         try:
             converted_image = convert(Image.open(io.BytesIO(data)))
