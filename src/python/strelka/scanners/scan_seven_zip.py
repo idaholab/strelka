@@ -5,8 +5,7 @@ import shutil
 import subprocess
 import tempfile
 
-from . import Scanner, Options
-from ..file import File
+from . import File, Options, Scanner
 
 from .common import password_cracking
 
