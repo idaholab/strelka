@@ -78,8 +78,6 @@ class ScanClamav(Scanner):
                 conn = clamd.ClamdNetworkSocket(host=host, port=int(port))
             else:
                 self.fail("invalid_socket_option")
-            if conn is None:
-                pass
             with io.BytesIO(data) as clam_io:
                 result = conn.instream(clam_io)
                 if result is None or "stream" not in result:
