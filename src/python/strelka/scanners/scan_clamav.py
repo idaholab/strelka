@@ -79,11 +79,12 @@ class ScanClamav(Scanner):
             else:
                 self.fail("invalid_socket_option")
             with io.BytesIO(data) as clam_io:
-                result = conn.instream(clam_io)
-                if result is None or "stream" not in result:
-                    self.add_flag("empty_result")
-                _, sig = (result or {}).get("stream", (None, None))
-                if sig is not None:
+                stream_data = (conn.instream(clam_io) or {}).get("stream")
+            if not stream_data:
+                self.add_flag("empty_result")
+            else:
+                _, sig = stream_data
+                if sig:
                     self.signature_matched(sig)
 
         except clamd.ConnectionError:
