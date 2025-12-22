@@ -9,6 +9,7 @@ import math
 from os import PathLike
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
@@ -334,19 +335,21 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
             encoding=encoding,
             errors=errors,
             text=text,
+            # sets child as process group leader (i.e., PID is PGID)
+            start_new_session=True,
             **popen_kwargs,
         )
         try:
             out, err = process.communicate(input, timeout)
-        except BaseTimeout:
-            process.kill()
+        except (BaseTimeout, subprocess.TimeoutExpired) as e:
+            pgid = process.pid
+            try:
+                os.killpg(pgid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             process.wait()
-            self.add_flag("subprocess_killed", None)
-            raise
-        except subprocess.TimeoutExpired:
-            self.add_flag("subprocess_timed_out", None)
-            process.kill()
-            process.wait()
+            if isinstance(e, subprocess.TimeoutExpired):
+                self.add_flag("subprocess_timed_out", None)
             self.add_flag("subprocess_killed", None)
             raise
         else:
