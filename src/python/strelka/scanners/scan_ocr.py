@@ -108,18 +108,17 @@ class ScanOcr(Scanner):
         # Stores as a base64 value in the key: base64_thumbnail
         if create_thumbnail:
             try:
-                image = Image.open(io.BytesIO(data))
-                image.thumbnail(thumbnail_size, Image.Resampling.BILINEAR)
-                buffered = io.BytesIO()
-                image.save(buffered, format="WEBP", quality=70, optimize=True)
-                base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                self.event["base64_thumbnail"] = base64_image
+                with Image.open(io.BytesIO(data)) as image:
+                    image.thumbnail(thumbnail_size, Image.Resampling.BILINEAR)
+                    buffered = io.BytesIO()
+                    image.save(buffered, format="WEBP", quality=70, optimize=True)
+                    self.event["base64_thumbnail"] = base64.b64encode(
+                        buffered.getvalue()
+                    ).decode("utf-8")
             except Exception as e:
                 self.flags.append(
                     f"{self.__class__.__name__}: image_thumbnail_error: {str(e)[:50]}"
                 )
-            finally:
-                image.close()
 
         # Perform OCR on the image data.
         with tempfile.NamedTemporaryFile(dir=tmp_directory) as tmp_data:
@@ -127,8 +126,8 @@ class ScanOcr(Scanner):
             tmp_data.flush()
 
             with tempfile.NamedTemporaryFile(dir=tmp_directory) as tmp_tess:
+                tess_txt_name = f"{tmp_tess.name}.txt"
                 try:
-                    tess_txt_name = f"{tmp_tess.name}.txt"
                     subprocess.run(
                         ["tesseract", tmp_data.name, tmp_tess.name],
                         capture_output=True,
@@ -140,16 +139,14 @@ class ScanOcr(Scanner):
                         if ocr_file:
                             self.event["text"] = ocr_file.split()
                         if extract_text:
-                            # Send extracted file back to Strelka
                             self.emit_file(ocr_file, name="text")
-
-                    os.remove(tess_txt_name)
 
                 except subprocess.CalledProcessError as e:
                     self.flags.append(
                         f"{self.__class__.__name__}: tesseract_process_error: {str(e)}"
                     )
                 finally:
-                    # Ensure tempfile is closed even after error is thrown
-                    tmp_data.close()
-                    tmp_tess.close()
+                    try:
+                        os.remove(tess_txt_name)
+                    except FileNotFoundError:
+                        pass

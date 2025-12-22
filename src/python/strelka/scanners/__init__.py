@@ -45,6 +45,7 @@ from ..model import (
     FileType,
     Hash,
     Indicator,
+    IndicatorParseError,
     Rule,
     ScannerResults,
     Technique,
@@ -683,8 +684,10 @@ class Scanner(ScannerUtilMethods, SpanCreatorMixin, metaclass=ABCMeta):
     ) -> Iterator[Indicator]:
         try:
             yield from Indicator.parse(what, self, type=type)
+        except IndicatorParseError:
+            logging.debug("failed to parse indicator: %r", what)
         except Exception:
-            logging.exception("failed to parse indicator: %r", what)
+            logging.exception("unexpected error while parsing indicator: %r", what)
 
     @deprecated("Use Scanner.add_related() or Scanner.add_rule_match() instead.")
     def add_iocs(self, values: Iterable[Any], /, *, type: str | None = None) -> None:

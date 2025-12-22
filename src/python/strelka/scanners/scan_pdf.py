@@ -103,10 +103,14 @@ class ScanPdf(Scanner):
         else:
             object_expr = None
 
-        with (
-            io.BytesIO(data) as pdf_io,
-            pymupdf.open(stream=pdf_io, filetype="pdf") as reader,
-        ):
+        try:
+            pdf_io = io.BytesIO(data)
+            reader = pymupdf.open(stream=pdf_io, filetype="pdf")
+        except Exception as e:
+            self.add_flag("pdf_open_error")
+            return
+
+        with pdf_io, reader:
             # Collect Metadata
             self.event.update(
                 {
@@ -156,16 +160,31 @@ class ScanPdf(Scanner):
                     }
                 )
 
-            # collect phone numbers
+            # collect phone numbers (don't fail the whole thing based on one malformed page)
+            text_chunks = []
+            try:
+                page_count = reader.page_count
+            except Exception:
+                self.add_flag("pdf_page_count_error")
+            else:
+                for i in range(page_count):
+                    try:
+                        page = reader.load_page(i)
+                        text_chunks.append(
+                            page.get_textpage().extractText()
+                        )
+                    except Exception:
+                        self.add_flag("pdf_page_processing_error")
+                        continue
+
+            full_text = (
+                " ".join(text_chunks)
+                .replace("\t", " ")
+                .replace("\n", " ")
+            )
             self.event["phones"].update(
                 "+{}".format("".join(x))
-                for x in PHONE_NUMBERS_REGEX.findall(
-                    " ".join(
-                        page.get_textpage().extractText() for page in reader.pages()
-                    )
-                    .replace("\t", " ")
-                    .replace("\n", " ")
-                )
+                for x in PHONE_NUMBERS_REGEX.findall(full_text)
             )
 
             # iterate through xref objects. Collect, count, and extract objects

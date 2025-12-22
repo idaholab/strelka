@@ -87,15 +87,14 @@ class ScanXml(Scanner):
             }
         )
 
-        # Extract and add Indicators of Compromise (IOCs)
-        self.add_related(extract_indicators_from_string(data.decode()))
-
         # Parse the XML content
         try:
             xml_buffer = data
             if xml_buffer.startswith(b"<?XML"):
                 xml_buffer = b"<?xml" + xml_buffer[5:]
             xml = etree.fromstring(xml_buffer)
+            # Extract and add Indicators of Compromise (IOCs)
+            self.add_related(extract_indicators_from_string(etree.tostring(xml, encoding="unicode", method="text")))
             docinfo = xml.getroottree().docinfo
             self.event["doc_type"] = docinfo.doctype if docinfo.doctype else ""
             self.event["version"] = docinfo.xml_version if docinfo.xml_version else ""
