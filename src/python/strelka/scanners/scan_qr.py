@@ -23,6 +23,8 @@ class ScanQr(Scanner):
 
         try:
             img = Image.open(io.BytesIO(data))
+            if img.mode == "P":
+                img = img.convert("RGBA")  # Convert palette to RGBA
             barcodes = decode(img)
 
             if barcodes:
