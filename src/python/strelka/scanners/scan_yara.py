@@ -72,17 +72,11 @@ class ScanYara(Scanner):
 
         if use_compiled:
             try:
-                rules = self._rules_cache.load(
-                    location / compiled_filename, self.load_yara_rules
-                )
+                rules = self._rules_cache.load(location / compiled_filename, self.load_yara_rules)
             except FileNotFoundError:
-                logging.warning(
-                    "Compiled YARA rules do not exist: %s", location / compiled_filename
-                )
+                logging.warning("Compiled YARA rules do not exist: %s", location / compiled_filename)
             except _NotLoaded:
-                logging.warning(
-                    "Failed to load compiled YARA rules, trying to compile instead."
-                )
+                logging.warning("Failed to load compiled YARA rules, trying to compile instead.")
 
         if not rules:
             try:
@@ -133,6 +127,12 @@ class ScanYara(Scanner):
             # Append rule matches and update tags.
             self.event["matches"].add(match.rule)
             self.event["tags"].update(match.tags)
+            self.add_rule_match(
+                name=match.rule,
+                provider=self.key,
+                category=match.namespace,
+                tags=match.tags if match else None,
+            )
 
             # Extract hex representation if configured to store offsets.
             if store_offset and offset_meta_key:
@@ -173,10 +173,7 @@ class ScanYara(Scanner):
         try:
             if path.is_dir():
                 return yara.compile(
-                    filepaths={
-                        f"namespace{i}": str(entry)
-                        for i, entry in enumerate(path.glob("**/*.yar*"))
-                    },
+                    filepaths={f"namespace{i}": str(entry) for i, entry in enumerate(path.glob("**/*.yar*"))},
                 )
             elif path.is_file():
                 return yara.compile(filepath=str(path))
@@ -300,9 +297,7 @@ class ScanYara(Scanner):
                 #   (between 32 and 126 inclusive).
                 # - Replace non-printable characters with a period ('.').
                 # E.g., a chunk [65, 66, 0] would become the string "AB."
-                ascii_values = "".join(
-                    [chr(byte) if 32 <= byte <= 126 else "." for byte in chunk]
-                )
+                ascii_values = "".join([chr(byte) if 32 <= byte <= 126 else "." for byte in chunk])
 
                 # Cache the generated hex and ASCII values to avoid redundant
                 # computation in the future
