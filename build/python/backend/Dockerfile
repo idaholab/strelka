@@ -21,8 +21,30 @@ ENV PYTHONUNBUFFERED=1
 ARG USERNAME=strelka
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-RUN groupadd --gid $USER_GID $USERNAME && \
-    useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME
+RUN set -eux; \
+    EXISTING_USER=$(getent passwd $USER_UID | cut -d: -f1 || true); \
+    if [ -n "$EXISTING_USER" ]; then \
+        echo "UID $USER_UID already exists as user $EXISTING_USER. Renaming to $USERNAME..."; \
+        # Rename group if it exists
+        if getent group $EXISTING_USER >/dev/null; then \
+            groupmod -n "$USERNAME" "$EXISTING_USER"; \
+        fi; \
+        # Rename user
+        usermod --login "$USERNAME" "$EXISTING_USER"; \
+        usermod --shell /bin/bash "$USERNAME"; \
+        usermod --home "/home/$USERNAME" "$USERNAME"; \
+        # Move home directory if it exists and is different
+        if [ -d "/home/$EXISTING_USER" ]; then \
+            mv "/home/$EXISTING_USER" "/home/$USERNAME"; \
+        else \
+            mkdir -p "/home/$USERNAME"; \
+        fi; \
+        chown -R "$USERNAME":"$USERNAME" "/home/$USERNAME"; \
+    else \
+        echo "Creating new user $USERNAME with UID $USER_UID..."; \
+        groupadd --gid $USER_GID $USERNAME; \
+        useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME; \
+    fi
 
 
 # Install build packages
