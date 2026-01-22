@@ -19,7 +19,7 @@ LABEL maintainer="Target Brands, Inc. TTS-CFC-OpenSource@target.com"
 
 RUN apk add tini
 
-USER 1001
+USER 1000
 
 # Copy binary to /usr/local/bin
 COPY --from=build /tmp/strelka-manager /usr/local/bin/strelka-manager

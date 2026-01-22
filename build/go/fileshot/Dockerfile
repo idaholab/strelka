@@ -24,7 +24,7 @@ COPY --from=build /tmp/strelka-fileshot /usr/local/bin/strelka-fileshot
 RUN apk add --no-cache jq
 
 # Initialize with non-root user
-USER 1001
+USER 1000
 
 # Set container entrypoint. This could be set/overridden elsewhere in deployment (e.g. k8s, docker-compose, etc.)
 # Currently overwritten in ./build/docker-compose.yml
