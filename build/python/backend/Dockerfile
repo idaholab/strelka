@@ -19,7 +19,7 @@ ENV PYTHONUNBUFFERED=1
 
 # User configuration
 ARG USERNAME=strelka
-ARG USER_UID=1001
+ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 RUN groupadd --gid $USER_GID $USERNAME && \
     useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME
@@ -192,7 +192,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN touch /var/log/clamav/freshclam.log && \
     chmod 777 /var/log/clamav/freshclam.log && \
     chown clamav:clamav /var/log/clamav/freshclam.log && \
-    chown 1001:1001 /var/lib/clamav
+    chown 1000:1000 /var/lib/clamav
 
 USER $USERNAME
 

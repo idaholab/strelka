@@ -24,7 +24,7 @@ COPY --from=build /tmp/strelka-oneshot /usr/local/bin/strelka-oneshot
 RUN apk add --no-cache jq
 
 # Initialize with non-root user
-USER 1001
+USER 1000
 
 ENV STRELKA_ONESHOT_FRONTENDURL=frontend:57314
 ENV STRELKA_ONESHOT_LOGPATH=-
