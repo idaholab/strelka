@@ -214,7 +214,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN touch /var/log/clamav/freshclam.log && \
     chmod 777 /var/log/clamav/freshclam.log && \
     chown clamav:clamav /var/log/clamav/freshclam.log && \
-    chown 1000:1000 /var/lib/clamav
+    chown "$USERNAME":"$USERNAME" /var/lib/clamav
 
 USER $USERNAME
 
