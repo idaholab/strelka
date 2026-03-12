@@ -111,11 +111,11 @@ RUN mkdir -p /tmp/build-exiftool && \
     cd /tmp && \
     rm -rf /tmp/build-exiftool
 
-# Download and move binary for 7z 24.09
+# Download and move binary for 7z 26.00
 RUN mkdir -p /tmp/install-7z && \
     cd /tmp/install-7z && \
-    curl -OL https://7-zip.org/a/7z2409-linux-x64.tar.xz && \
-    tar -xf 7z2409-linux-x64.tar.xz && \
+    curl -o 7z.tar.xz -fsSL https://7-zip.org/a/7z2600-linux-$(uname -m | sed 's/x86_64/x64/' | sed 's/aarch64/arm64/').tar.xz && \
+    tar -xf 7z.tar.xz && \
     cp 7zz /usr/bin/ && \
     cd /tmp && \
     rm -rf /tmp/install-7z
