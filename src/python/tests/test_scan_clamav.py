@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 import subprocess
 
-import clamd
+import clamav_client.clamd as clamd
 from pytest import fixture
 
 from strelka.testing import (

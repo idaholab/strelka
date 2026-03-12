@@ -5,7 +5,7 @@ import re
 import subprocess
 from typing import Any, ClassVar, Iterable
 
-import clamd
+import clamav_client.clamd as clamd
 
 from . import Options, Scanner
 from ..model import Date, File
@@ -87,8 +87,8 @@ class ScanClamav(Scanner):
                 if sig:
                     self.signature_matched(sig)
 
-        except clamd.ConnectionError:
-            self.add_flag("conn_error")
+        except clamd.CommunicationError:
+            self.add_flag("comm_error")
         except clamd.BufferTooLongError:
             self.add_flag("size_error")
         except clamd.ClamdError:

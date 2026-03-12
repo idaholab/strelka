@@ -92,7 +92,7 @@ zipp = "^3.20.1"
 
 # Git dependencies
 chaskey = { git = "https://github.com/volexity/chaskey-lts", rev = "2fd80f732dd9422a9e92556758180ceee3b5b4ec" }  # For donut-decryptor
-clamd = { git = "https://github.com/graingert/python-clamd", rev = "24b21e8c875b88ba8a03c29ba2ef04887a8d56c5" }
+clamd = { git = "https://github.com/artefactual-labs/clamav-client", rev = "56f3f1d19d321fbf471699bd1f0e570a03410c44" }
 donut-decryptor = { git = "https://github.com/volexity/donut-decryptor", rev = "5a0f9f87094efe6e8d131d3fa4abf23f31123784" } # For donut-decryptor
 entropy = { git = "https://github.com/jshlbrd/python-entropy.git", rev = "a49f1addccb88d54115832a6d1982b957a56f329" }
 oscrypto = { git = "https://github.com/wbond/oscrypto.git", rev = "1547f535001ba568b239b8797465536759c742a3" } # for OpenSSL 3.0.10+ support (wbond/oscrypto#78)
