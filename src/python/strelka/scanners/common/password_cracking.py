@@ -24,7 +24,7 @@ def office2john(data: bytes, tmp_dir: str) -> bytes:
             tmp_data.write(data)
             tmp_data.flush()
 
-            (stdout, stderr) = subprocess.Popen(
+            stdout, stderr = subprocess.Popen(
                 ["/jtr/office2john.py", tmp_data.name],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -42,7 +42,7 @@ def zip2john(data: bytes, tmp_dir: str) -> bytes:
             tmp_data.write(data)
             tmp_data.flush()
 
-            (stdout, stderr) = subprocess.Popen(
+            stdout, stderr = subprocess.Popen(
                 ["/jtr/zip2john.py", tmp_data.name],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -60,7 +60,7 @@ def sevenzip2john(data: bytes, tmp_dir: str) -> bytes:
             tmp_data.write(data)
             tmp_data.flush()
 
-            (stdout, stderr) = subprocess.Popen(
+            stdout, stderr = subprocess.Popen(
                 ["/jtr/7z2john.pl", tmp_data.name],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -94,7 +94,7 @@ def crack_john(
         tmp_data.write(hashes)
         tmp_data.flush()
 
-        (stdout, stderr) = subprocess.Popen(
+        stdout, stderr = subprocess.Popen(
             [jtr_path + "john", "--show", tmp_data.name],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -108,7 +108,7 @@ def crack_john(
         if b"0 password hashes cracked" in stdout:
             self.flags.append("wordlist")
             if os.path.isfile(password_file):
-                (stdout, stderr) = subprocess.Popen(
+                stdout, stderr = subprocess.Popen(
                     [jtr_path + "john", f"-w={password_file}", tmp_data.name],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -124,7 +124,7 @@ def crack_john(
             if brute:
                 self.flags.append("incremental")
                 brute_time_start = time.time()
-                (stdout, stderr) = subprocess.Popen(
+                stdout, stderr = subprocess.Popen(
                     [
                         jtr_path + "john",
                         "--incremental=Alnum",

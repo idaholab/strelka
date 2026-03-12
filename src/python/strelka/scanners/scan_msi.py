@@ -169,18 +169,9 @@ class Event:
 
 
 class ScanMsi(Scanner):
-    """Collects metadata parsed by Exiftool.
+    """Collects metadata parsed by pymsi."""
 
-    Options:
-        keys: exiftool key values to log in the event.
-            Defaults to all.
-        tmp_directory: Location where tempfile writes temporary files.
-            Defaults to system temporary directory.
-    """
-
-    def scan(
-        self, data: bytes, file: model.File, options: Options, expire_at: Date
-    ) -> Event:
+    def scan(self, data: bytes, file: model.File, options: Options, expire_at: Date) -> Event:
         file_limit = self.evaluate_limit(options.get("limit", -1))
 
         event = Event()
@@ -195,9 +186,7 @@ class ScanMsi(Scanner):
                     author=s.author(),
                     comments=s.comments(),
                     creating_application=s.creating_application(),
-                    creation_time=(
-                        t.astimezone(datetime.UTC) if (t := s.creation_time()) else None
-                    ),
+                    creation_time=(t.astimezone(datetime.UTC) if (t := s.creation_time()) else None),
                     languages=self.map_windows_locales(s.languages()),
                     subject=s.subject(),
                     title=s.title(),
@@ -320,22 +309,14 @@ class ScanMsi(Scanner):
                                 attributes=f.attributes,
                                 codec=f.codec,
                                 media=m.id,
-                                timestamp=(
-                                    t.astimezone(datetime.UTC)
-                                    if (t := f.timestamp)
-                                    else None
-                                ),
+                                timestamp=(t.astimezone(datetime.UTC) if (t := f.timestamp) else None),
                                 size=f.size,
                                 child_id=self.emit_file(
                                     file_data,
                                     name=f.name,
                                     unique_key=("file", m.id, f.offset),
                                     size=f.size,
-                                    mtime=(
-                                        t.astimezone(datetime.UTC)
-                                        if (t := f.timestamp)
-                                        else None
-                                    ),
+                                    mtime=(t.astimezone(datetime.UTC) if (t := f.timestamp) else None),
                                 ),
                             )
                         )
@@ -351,12 +332,7 @@ class ScanMsi(Scanner):
     @staticmethod
     def map_windows_locales(values: Iterable[int | str] | None) -> list[str | int]:
         return [
-            (
-                locale.windows_locale.get(int(e), e)
-                if isinstance(e, int) or e.isdigit()
-                else e
-            )
-            for e in (values or ())
+            (locale.windows_locale.get(int(e), e) if isinstance(e, int) or e.isdigit() else e) for e in (values or ())
         ]
 
     @staticmethod
@@ -366,9 +342,7 @@ class ScanMsi(Scanner):
         value = propset[name]
         return values.get(value, value)
 
-    def get_object_path(
-        self, what: pymsi.File | pymsi.Shortcut | pymsi.Directory | None
-    ) -> PurePosixPath:
+    def get_object_path(self, what: pymsi.File | pymsi.Shortcut | pymsi.Directory | None) -> PurePosixPath:
         if what is None:
             return PurePosixPath("/")
         elif isinstance(what, pymsi.Directory):
