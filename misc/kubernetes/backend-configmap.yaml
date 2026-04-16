@@ -399,10 +399,16 @@ data:
               - 'text/x-ruby'
           priority: 5
       # 'ScanStrings':
-      #   - positive:
+      #   - negative:
+      #       flavors:
+      #         - 'base64'
+      #     positive:
       #       flavors:
       #         - 'mz_file'
       #     priority: 5
+      #     options:
+      #       limit: 0
+      #       min_length: 6
       'ScanSwf':
         - positive:
             flavors:

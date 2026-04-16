@@ -579,13 +579,16 @@ scanners:
         log_pws: True
 #        brute_force: True
 #  'ScanStrings':
-#    - positive:
-#        flavors:
-#          - 'mz_file'
 #    - negative:
 #        flavors:
 #          - 'base64'
+#      positive:
+#        flavors:
+#          - 'mz_file'
 #      priority: 5
+#      options:
+#        limit: 0
+#        min_length: 4
   'ScanSwf':
     - positive:
         flavors:
