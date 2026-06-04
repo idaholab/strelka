@@ -10,6 +10,7 @@ ARG JOHN_VERSION=1.9.1-ce
 ARG YARA_VERSION=4.5.5
 ARG YARA_PYTHON_VERSION=4.5.4
 ARG EXIFTOOL_VERSION=12.60
+ARG ARCHIVE_ZIP_VERSION=1.68
 ARG CAPA_VERSION=9.4.0
 
 # Environment variables
@@ -46,18 +47,64 @@ RUN set -eux; \
         useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME; \
     fi
 
-
-# Install build packages
+# Install build and runtime packages
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update -qq && \
     apt-get install -qq -y --no-install-recommends \
-        autoconf automake build-essential ca-certificates cmake curl gcc git dirmngr \
-        gnupg gpg libbz2-dev libgmp-dev libglu1-mesa liblzma-dev libpcap-dev \
-        libarchive-dev libfuzzy-dev libjansson-dev libmagic-dev libssl-dev \
-        libffi-dev libreadline-dev libsqlite3-dev libncurses-dev \
-        libtool libgomp1 make ncat openssh-client swig pkg-config supervisor \
-        yasm zlib1g-dev tini && \
+    antiword \
+    autoconf \
+    automake \
+    binwalk \
+    build-essential \
+    ca-certificates \
+    cmake \
+    curl \
+    gcc \
+    git \
+    gpg \
+    jq \
+    libarchive-dev \
+    libbz2-dev \
+    libffi-dev \
+    libfuzzy-dev \
+    libgl1 \
+    libglu1-mesa \
+    libgmp-dev \
+    libgomp1 \
+    libjansson-dev \
+    liblzma-dev \
+    libmagic-dev \
+    libmagic-mgc \
+    libncurses-dev \
+    libpcap-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libssl3 \
+    libtool \
+    libzbar0 \
+    make \
+    ncat \
+    openssh-client \
+    openssl \
+    pkg-config \
+    python-is-python3 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    python3-pkg-resources \
+    python3-setuptools \
+    redis-server \
+    supervisor \
+    swig \
+    tesseract-ocr \
+    tini \
+    unrar \
+    unzip \
+    upx \
+    yasm \
+    zlib1g-dev && \
     cpan -i Compress::Raw::Lzma && \
     rm -rf /var/lib/apt/lists/*
 
@@ -121,17 +168,24 @@ RUN mkdir -p /tmp/build-jtr && \
     cd /tmp && \
     rm -rf /tmp/build-jtr
 
-# Download and compile exiftool
-RUN mkdir -p /tmp/build-exiftool && \
+# Download and compile archive library and exiftool
+RUN mkdir -p /tmp/archive-zip /tmp/build-exiftool && \
+    cd /tmp/archive-zip && \
+    curl -OL https://cpan.metacpan.org/authors/id/P/PH/PHRED/Archive-Zip-$ARCHIVE_ZIP_VERSION.tar.gz && \
+    tar -xzf Archive-Zip-$ARCHIVE_ZIP_VERSION.tar.gz && \
+    cd Archive-Zip-$ARCHIVE_ZIP_VERSION/ && \
+    perl Makefile.PL && \
+    make && \
+    make install && \
     cd /tmp/build-exiftool && \
     curl -OL https://github.com/exiftool/exiftool/archive/refs/tags/$EXIFTOOL_VERSION.tar.gz && \
     tar -xf $EXIFTOOL_VERSION.tar.gz && \
     cd exiftool-$EXIFTOOL_VERSION && \
     perl Makefile.PL && \
-    make -s && \
-    make -s install && \
+    make && \
+    make install && \
     cd /tmp && \
-    rm -rf /tmp/build-exiftool
+    rm -rf /tmp/archive-zip /tmp/build-exiftool
 
 # Download and move binary for 7z 26.00
 RUN mkdir -p /tmp/install-7z && \
@@ -142,26 +196,25 @@ RUN mkdir -p /tmp/install-7z && \
     cd /tmp && \
     rm -rf /tmp/install-7z
 
-# Install YARA
-RUN mkdir -p /tmp/build-yara && \
+# Install YARA and yara-python
+RUN mkdir -p /tmp/build-yara /tmp/build-yara-python && \
     cd /tmp/build-yara && \
     curl -OL https://github.com/VirusTotal/yara/archive/v$YARA_VERSION.tar.gz && \
     tar -xf v$YARA_VERSION.tar.gz && \
     cd yara-$YARA_VERSION && \
     ./bootstrap.sh && \
-    ./configure --with-crypto --enable-magic --enable-cuckoo && \
-    make -s && \
-    make -s install && \
-    make -s check && \
+    CC='gcc' CFLAGS='-O0 -fPIC -fno-optimize-sibling-calls' ./configure --with-crypto --enable-magic --enable-cuckoo && \
+    make -j1 && \
+    make install && \
     cd /tmp && \
-    rm -rf /tmp/build-yara
-
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-    python-is-python3 && \
-    rm -rf /var/lib/apt/lists/*
+    cd /tmp/build-yara-python && \
+    curl -OL https://github.com/VirusTotal/yara-python/archive/v$YARA_PYTHON_VERSION.tar.gz && \
+    tar -xf v$YARA_PYTHON_VERSION.tar.gz && \
+    cd yara-python-$YARA_PYTHON_VERSION && \
+    python3 setup.py build --dynamic-linking && \
+    python3 setup.py install && \
+    cd /tmp && \
+    rm -rf /tmp/build-yara /tmp/build-yara-python
 
 # install zeek
 ARG ZEEK_INTEGRATION=1
@@ -171,10 +224,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         echo "Zeek enabled — installing…"; \
         echo 'deb http://download.opensuse.org/repositories/security:/zeek/xUbuntu_24.04/ /' \
             | tee /etc/apt/sources.list.d/security:zeek.list && \
-        curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_24.04/Release.key \
-            | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
+        curl -fsSL https://download.opensuse.org/repositories/security:zeek/xUbuntu_24.04/Release.key | gpg --dearmor | tee /etc/apt/trusted.gpg.d/security_zeek.gpg > /dev/null && \
         apt-get -qq update && \
         apt-get install -qq -y --no-install-recommends zeek-lts && \
+        apt-mark manual zeek-lts && \
         cp /opt/zeek/bin/zeek /usr/bin/ && \
         rm -rf /opt/zeek/share/btest /opt/zeek/bin && \
         rm -rf /opt/zeek/lib/*.a && \
@@ -182,6 +235,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     else \
         echo "Zeek disabled — skipping."; \
     fi
+ENV PATH=$PATH:/opt/zeek/bin
 
 # install suricata
 ARG SURICATA_INTEGRATION=1
@@ -198,6 +252,30 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     else \
         echo "Suricata disabled — skipping."; \
     fi
+
+#Copy Suricata config to default location
+COPY configs/python/backend/suricata/suricata.yaml /etc/suricata/suricata.yaml
+
+# Build/install CAPA
+RUN mkdir -p /tmp/build-capa && \
+    python3 -m venv /tmp/build-capa && \
+    cd /tmp/build-capa && \
+    . ./bin/activate && \
+    curl -fsSLo ./capa.zip https://github.com/mandiant/capa/archive/refs/tags/v$CAPA_VERSION.zip && \
+    curl -fsSLo ./rules.zip https://github.com/mandiant/capa-rules/archive/refs/tags/v$CAPA_VERSION.zip && \
+    unzip -q ./capa.zip && \
+    unzip -q ./rules.zip && \
+    cd capa-$CAPA_VERSION && \
+    python3 -m pip install -e .[build] && \
+    mv ../capa-rules-$CAPA_VERSION/* ./rules/ && \
+    python3 ./scripts/cache-ruleset.py rules/ cache && \
+    pyinstaller ./.github/pyinstaller/pyinstaller.spec && \
+    chmod 755 ./dist/capa && \
+    mv ./dist/capa /tmp/capa && \
+    deactivate && \
+    mv /tmp/capa /usr/bin/ && \
+    chown root:root /usr/bin/capa && \
+    rm -rf /tmp/build-capa
 
 # Install ClamAV
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -223,120 +301,86 @@ RUN freshclam
 
 USER root
 
-# Install runtime packages
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update -qq && \
-    apt-get install -qq -y --no-install-recommends \
-    antiword \
-    binwalk \
-    libzbar0 \
-    libgl1 \
-    redis-server \
-    tesseract-ocr \
-    unrar \
-    unzip \
-    upx \
-    jq && \
-    rm -rf /var/lib/apt/lists/*
+# Install Poetry globally and copy project files
+ENV POETRY_HOME="/opt/poetry"
+ENV POETRY_VIRTUALENVS_IN_PROJECT=false
+ENV POETRY_NO_INTERACTION=1
 
+# Ensure the poetry bin directory is added to the PATH
+ENV PATH="$POETRY_HOME/bin:$PATH"
+
+# Install Poetry using its official installation script
+RUN curl -sSL https://install.python-poetry.org | python3 -
+
+# Set the working directory and copy the project files
+WORKDIR /strelka/
+COPY pyproject.toml poetry.lock ./
+
+# Use Poetry to install the project dependencies globally
+# This step is after the COPY step because it is more likely to change,
+# and therefore should not be included in earlier layers that can be cached.
+RUN python3 -m pip install --break-system-packages --no-cache-dir --no-compile --upgrade \
+    pyinstaller \
+    ruamel.yaml \
+    rich-argparse \
+    semver \
+    'ssdeep==3.4' && \
+    poetry config virtualenvs.create false && \
+    poetry install --only main && \
+    rm -rf /root/.cache/pypoetry
+
+# Copy Strelka files
+COPY ./src/python/ /strelka/
+COPY ./configs/python/backend/ /etc/strelka/
+
+# Install Strelka
+RUN cd /strelka/ && \
+    python3 setup.py -q build && \
+    python3 setup.py -q install && \
+# Remove build packages
+    python3 setup.py -q clean --all && \
+    rm -rf dist/ strelka.egg-info && \
+    apt-get purge -y \
+    automake \
+    build-essential \
+    cmake \
+    curl \
+    gcc \
+    git \
+    gpg \
+    libtool \
+    make \
+    python3-dev \
+    python3-pip \
+    python3-wheel && \
+    apt-get clean -qq && \
+    rm -rf /var/lib/apt/lists/* && \
 # Assign permissions to Strelka scan result logging directory
-RUN mkdir /var/log/strelka/ && \
+    mkdir /var/log/strelka/ && \
     chgrp -R 0 /var/log/strelka/ && \
     chmod -R g=u /var/log/strelka/
 
-USER $USERNAME
-
-RUN export HOME=/home/$USERNAME && \
-    curl -fsSL https://pyenv.run | bash
-
-ENV PYENV_ROOT=/home/$USERNAME/.pyenv
-ENV PATH=/home/$USERNAME/.pyenv/bin:/home/$USERNAME/.pyenv/shims:$PATH
-
-RUN export HOME=/home/$USERNAME && \
-    pyenv install 3.11 && \
-    pyenv global 3.11
-
-# Install common Python build dependencies
-RUN python3 -m pip install -U pip setuptools pyinstaller
-
-# Install yara-python
-RUN mkdir -p /tmp/build-yara-python && \
-    cd /tmp/build-yara-python && \
-    curl -OL https://github.com/VirusTotal/yara-python/archive/v$YARA_PYTHON_VERSION.tar.gz && \
-    tar -xf v$YARA_PYTHON_VERSION.tar.gz && \
-    cd yara-python-$YARA_PYTHON_VERSION && \
-    python3 setup.py build --dynamic-linking && \
-    python3 setup.py install && \
-    cd /tmp && \
-    rm -rf /tmp/build-yara-python
-
-# Build/install CAPA
-RUN mkdir -p /tmp/build-capa && \
-    python3 -m venv /tmp/build-capa && \
-    cd /tmp/build-capa && \
-    . ./bin/activate && \
-    curl -fsSLo ./capa.zip https://github.com/mandiant/capa/archive/refs/tags/v$CAPA_VERSION.zip && \
-    curl -fsSLo ./rules.zip https://github.com/mandiant/capa-rules/archive/refs/tags/v$CAPA_VERSION.zip && \
-    unzip -q ./capa.zip && \
-    unzip -q ./rules.zip && \
-    cd capa-$CAPA_VERSION && \
-    python3 -m pip install -e .[build] && \
-    mv ../capa-rules-$CAPA_VERSION/* ./rules/ && \
-    python3 ./scripts/cache-ruleset.py rules/ cache && \
-    pyinstaller ./.github/pyinstaller/pyinstaller.spec && \
-    chmod 755 ./dist/capa && \
-    mv ./dist/capa /tmp/capa && \
-    deactivate && \
-    rm -rf /tmp/build-capa
-
-USER root
-
-RUN mv /tmp/capa /usr/bin/ && \
-    chown root:root /usr/bin/capa
-
-USER $USERNAME
-
-RUN python3 -m pip install poetry ruamel.yaml rich-argparse semver && \
-    poetry config virtualenvs.create false
-
-# Set the working directory and copy the project files
-WORKDIR /home/$USERNAME/strelka/
-ADD ./pyproject.toml ./poetry.lock ./
-
-RUN poetry install --only main
-
-COPY --chown=$USERNAME:$USERNAME \
-    ./src/python/ ./
-RUN ls -alsF && python3 setup.py -q build && \
-    python3 setup.py -q install
-
-USER root
-
-# copy configs to default location
-COPY ./configs/python/backend/suricata/suricata.yaml /etc/suricata/suricata.yaml
-COPY ./configs/python/backend/ /etc/strelka/
-
 ## FIXME: tests currently disabled while they're being fixed still, sorry!
-## Run tests as non-root user
-#USER $USERNAME
-#
-## Run build checks
-## Use --build-arg SCANNER_TEST=test_scan_<scannername>.py to ignore all but selected scanner
-## ex: docker-compose build --build-arg SCANNER_TEST=test_scan_yara.py
-#ARG SCANNER_TEST=""
-#
-## Run tests. Fail build if any tests fail.
-#RUN echo '[+] Run build checks' && \
-#    cd /strelka/strelka/ && \
-#    if $SCANNER_TESTS; then python3 -m pytest -p no:cacheprovider -s tests/$SCANNER_TEST; fi && \
-#    if $CONFIG_TESTS; then python3 -m pytest -s tests_configuration/; fi && \
-#    echo '[+] Done'
+# # Run tests as non-root user
+# USER $USERNAME
 
-USER root
+# # Run build checks
+# # Use --build-arg SCANNER_TEST=test_scan_<scannername>.py to ignore all but selected scanner
+# # ex: docker-compose build --build-arg SCANNER_TEST=test_scan_yara.py
+# ARG SCANNER_TEST=""
+
+# # Run tests. Fail build if any tests fail.
+# RUN echo '[+] Run build checks' && \
+#     cd /strelka/strelka/ && \
+#     if $SCANNER_TESTS; then python3 -m pytest -p no:cacheprovider -s tests/$SCANNER_TEST; fi && \
+#     if $CONFIG_TESTS; then python3 -m pytest -s tests_configuration/; fi && \
+#     echo '[+] Done'
+
+# USER root
 
 # Remove build directories and unused files
-RUN rm -rf /home/$USERNAME/strelka/ && \
+RUN cd /strelka/ && \
+    rm -rf /strelka/ && \
     rm -rf /root/.cache && \
     rm -rf /tmp/*
 
@@ -347,5 +391,5 @@ RUN rm -rf /etc/strelka/
 USER $USERNAME
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["/home/strelka/.pyenv/bin/pyenv", "exec", "strelka-backend"]
+CMD ["strelka-backend"]
 
