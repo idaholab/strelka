@@ -1388,13 +1388,14 @@ files = [
 
 [[package]]
 name = "jsbeautifier"
-version = "1.14.9"
+version = "1.15.4"
 description = "JavaScript unobfuscator and beautifier."
 optional = false
 python-versions = "*"
 groups = ["main"]
 files = [
-    {file = "jsbeautifier-1.14.9.tar.gz", hash = "sha256:c738ebc36b47bd94e4ca6dd17a9004c3cc74edad582ca1d60e0e5d5945a63cb9"},
+    {file = "jsbeautifier-1.15.4-py3-none-any.whl", hash = "sha256:72f65de312a3f10900d7685557f84cb61a9733c50dcc27271a39f5b0051bf528"},
+    {file = "jsbeautifier-1.15.4.tar.gz", hash = "sha256:5bb18d9efb9331d825735fbc5360ee8f1aac5e52780042803943aa7f854f7592"},
 ]
 
 [package.dependencies]
@@ -4542,4 +4543,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "ad3d51e53c1f9831b23ca3fbf446ea4338934ab247ec4d61aa49b37f4788f44f"
+content-hash = "ebf1cdc45166a56fc904a2c4ddd13d86b54017d42ddfc7be61fbb545659c8ad0"
