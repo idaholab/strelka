@@ -2997,6 +2997,17 @@ files = [
 windows-terminal = ["colorama (>=0.4.6)"]
 
 [[package]]
+name = "pylzma"
+version = "0.5.0"
+description = "Python bindings for the LZMA library by Igor Pavlov."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pylzma-0.5.0.tar.gz", hash = "sha256:b874172afbf37770e643bf2dc9d9b6b03eb95d8f8162e157145b3fe9e1b68a1c"},
+]
+
+[[package]]
 name = "pymupdf"
 version = "1.26.5"
 description = "A high performance Python library for data extraction, analysis, conversion & manipulation of PDF (and other) documents."
@@ -4531,4 +4542,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "a149aec9487e53e1671ebbeae2b58fb42f39b841be9f2d26bc035a869d27e87e"
+content-hash = "e726ba212ac9457c43d9b48e59714b4c42ecd499fc849c3ae195230e8e85b7d7"
