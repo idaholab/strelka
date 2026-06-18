@@ -4,6 +4,18 @@ import tarfile
 from . import Scanner
 
 
+# Mitigation for CVE-2025-8194
+# https://nvd.nist.gov/vuln/detail/CVE-2025-8194
+def _block_patched(self, count):
+    if count < 0:
+        raise tarfile.InvalidHeaderError("invalid offset")
+    return _block_patched._orig_block(self, count)
+
+
+_block_patched._orig_block = tarfile.TarInfo._block
+tarfile.TarInfo._block = _block_patched
+
+
 class ScanTar(Scanner):
     """Extract files from tar archives.
 
@@ -33,9 +45,7 @@ class ScanTar(Scanner):
                                 tar_file = tar_obj.extractfile(tar_member)
                                 if tar_file is not None:
                                     # Send extracted file back to Strelka
-                                    self.emit_file(
-                                        tar_file.read(), name=tar_member.name
-                                    )
+                                    self.emit_file(tar_file.read(), name=tar_member.name)
 
                                     self.event["total"]["extracted"] += 1
 
