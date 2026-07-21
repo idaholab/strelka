@@ -302,6 +302,7 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir --no-compile -
     semver \
     'ssdeep==3.4' && \
     poetry config virtualenvs.create false && \
+    rm -f /usr/lib/python3.12/EXTERNALLY-MANAGED && \
     poetry install --only main && \
     python3 -c "import cv2, numpy; print('cv2', cv2.__version__, 'numpy', numpy.__version__)" && \
     rm -rf /root/.cache/pypoetry
@@ -314,6 +315,7 @@ COPY ./configs/python/backend/ /etc/strelka/
 RUN cd /strelka/ && \
     python3 setup.py -q build && \
     python3 setup.py -q install && \
+    python3 -c "import strelka.backend; import importlib; [importlib.import_module(f'strelka.scanners.{m}') for m in ['scan_lsb','scan_nf']]; print('scanner imports OK')" && \
 # Remove build packages
     python3 setup.py -q clean --all && \
     rm -rf dist/ strelka.egg-info && \
@@ -336,8 +338,6 @@ RUN cd /strelka/ && \
     mkdir /var/log/strelka/ && \
     chgrp -R 0 /var/log/strelka/ && \
     chmod -R g=u /var/log/strelka/
-
-RUN python3 -c "import importlib; [importlib.import_module(f'strelka.scanners.{m}') for m in ['scan_lsb','scan_nf']]"
 
 ## FIXME: tests currently disabled while they're being fixed still, sorry!
 # # Run tests as non-root user
