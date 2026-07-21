@@ -46,8 +46,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libbz2-dev \
     libffi-dev \
     libfuzzy-dev \
-    libgl1 \
-    libglu1-mesa \
     libgmp-dev \
     libgomp1 \
     libjansson-dev \
@@ -305,6 +303,7 @@ RUN python3 -m pip install --break-system-packages --no-cache-dir --no-compile -
     'ssdeep==3.4' && \
     poetry config virtualenvs.create false && \
     poetry install --only main && \
+    python3 -c "import cv2, numpy; print('cv2', cv2.__version__, 'numpy', numpy.__version__)" && \
     rm -rf /root/.cache/pypoetry
 
 # Copy Strelka files
@@ -337,6 +336,8 @@ RUN cd /strelka/ && \
     mkdir /var/log/strelka/ && \
     chgrp -R 0 /var/log/strelka/ && \
     chmod -R g=u /var/log/strelka/
+
+RUN python3 -c "import importlib; [importlib.import_module(f'strelka.scanners.{m}') for m in ['scan_lsb','scan_nf']]"
 
 ## FIXME: tests currently disabled while they're being fixed still, sorry!
 # # Run tests as non-root user

@@ -1892,44 +1892,20 @@ pyparsing = ">=2.1.0,<4"
 full = ["XLMMacroDeobfuscator"]
 
 [[package]]
-name = "opencv-contrib-python"
+name = "opencv-contrib-python-headless"
 version = "4.8.1.78"
 description = "Wrapper package for OpenCV python bindings."
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "opencv-contrib-python-4.8.1.78.tar.gz", hash = "sha256:81804332299d656905d4f404fcec5f400d692c652d7a47926b7a441272ce795b"},
-    {file = "opencv_contrib_python-4.8.1.78-cp37-abi3-macosx_10_16_x86_64.whl", hash = "sha256:8d97192471c7d42532103ecebf8ad9d9534b7cd655ffadbccacb9ff3d4d49b40"},
-    {file = "opencv_contrib_python-4.8.1.78-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:8d6feb39d4af2cd1e8919110229bfedd13d4798a089bbe88fbd1a001b664d552"},
-    {file = "opencv_contrib_python-4.8.1.78-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6cad1720ac701cb3742f48f95bef5cfa288b916b6ac5700f63d5809e3ad5999e"},
-    {file = "opencv_contrib_python-4.8.1.78-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3fb62bc5967a79bce7c576ef94dea0b9172e52bab91630103e042cb5f29a148a"},
-    {file = "opencv_contrib_python-4.8.1.78-cp37-abi3-win32.whl", hash = "sha256:f8737cf3055a6156c66c75432ed28ee3c1d52532b17d91ed73d508ae351b3e66"},
-    {file = "opencv_contrib_python-4.8.1.78-cp37-abi3-win_amd64.whl", hash = "sha256:377936b02dcf82dc70261101381a8ad82b03d1298f185886be298d74fe35c328"},
-]
-
-[package.dependencies]
-numpy = [
-    {version = ">=1.21.2", markers = "platform_system != \"Darwin\" and python_version >= \"3.10\""},
-    {version = ">=1.21.4", markers = "python_version >= \"3.10\" and platform_system == \"Darwin\""},
-    {version = ">=1.23.5", markers = "python_version >= \"3.11\""},
-]
-
-[[package]]
-name = "opencv-python"
-version = "4.8.1.78"
-description = "Wrapper package for OpenCV python bindings."
-optional = false
-python-versions = ">=3.6"
-groups = ["main"]
-files = [
-    {file = "opencv-python-4.8.1.78.tar.gz", hash = "sha256:cc7adbbcd1112877a39274106cb2752e04984bc01a031162952e97450d6117f6"},
-    {file = "opencv_python-4.8.1.78-cp37-abi3-macosx_10_16_x86_64.whl", hash = "sha256:91d5f6f5209dc2635d496f6b8ca6573ecdad051a09e6b5de4c399b8e673c60da"},
-    {file = "opencv_python-4.8.1.78-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:bc31f47e05447da8b3089faa0a07ffe80e114c91ce0b171e6424f9badbd1c5cd"},
-    {file = "opencv_python-4.8.1.78-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9814beca408d3a0eca1bae7e3e5be68b07c17ecceb392b94170881216e09b319"},
-    {file = "opencv_python-4.8.1.78-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c4c406bdb41eb21ea51b4e90dfbc989c002786c3f601c236a99c59a54670a394"},
-    {file = "opencv_python-4.8.1.78-cp37-abi3-win32.whl", hash = "sha256:a7aac3900fbacf55b551e7b53626c3dad4c71ce85643645c43e91fcb19045e47"},
-    {file = "opencv_python-4.8.1.78-cp37-abi3-win_amd64.whl", hash = "sha256:b983197f97cfa6fcb74e1da1802c7497a6f94ed561aba6980f1f33123f904956"},
+    {file = "opencv-contrib-python-headless-4.8.1.78.tar.gz", hash = "sha256:6954205661c90e6f94b8b5158ea5d79165d9cc335170e8bea20ad565a75daa5a"},
+    {file = "opencv_contrib_python_headless-4.8.1.78-cp37-abi3-macosx_10_16_x86_64.whl", hash = "sha256:330255c987fded511cbe76a3ea9b4f9d5970c0c03f9db544ad44e1db81e1d75b"},
+    {file = "opencv_contrib_python_headless-4.8.1.78-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:07df781b5d2d5f7d729239fcf4674616601f3f375ae58d9dacb599d513b11108"},
+    {file = "opencv_contrib_python_headless-4.8.1.78-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:750491b9f6ad7e2d1820649cee7db6cf0b927e6d4f994953435a476ac6e902ae"},
+    {file = "opencv_contrib_python_headless-4.8.1.78-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9a6674d5f8428315c0c4be6f08fbc3a3ece4e703ed76fdb770dde4e2a265f193"},
+    {file = "opencv_contrib_python_headless-4.8.1.78-cp37-abi3-win32.whl", hash = "sha256:84992dc32476ced6b00628e1bb912eca28a440921ee994e8c674e5ef31eb9f06"},
+    {file = "opencv_contrib_python_headless-4.8.1.78-cp37-abi3-win_amd64.whl", hash = "sha256:7a5ff6365de18705466ed67b0ef291a2c38dba98e320da18d2d51cc5fbd0079a"},
 ]
 
 [package.dependencies]
@@ -4536,4 +4512,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "3c02af854d6bb030293f7452f8d9eb0bba6ef7648218bfc102c0344e3b9576d8"
+content-hash = "b926613fe56c9fb2a2cd330302f34df6cb8d6cbef5faf83c2d45baaf5e5a61d1"
