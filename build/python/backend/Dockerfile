@@ -313,12 +313,11 @@ COPY ./configs/python/backend/ /etc/strelka/
 
 # Install Strelka
 RUN cd /strelka/ && \
-    python3 setup.py -q build && \
-    python3 setup.py -q install && \
-    python3 -c "import strelka.backend; import importlib; [importlib.import_module(f'strelka.scanners.{m}') for m in ['scan_lsb','scan_nf']]; print('scanner imports OK')" && \
-# Remove build packages
-    python3 setup.py -q clean --all && \
-    rm -rf dist/ strelka.egg-info && \
+    rm -f pyproject.toml poetry.lock && \
+    python3 -m pip install --break-system-packages --no-cache-dir --no-build-isolation . && \
+    (cd /tmp && python3 -c "import strelka.backend; import importlib; [importlib.import_module(f'strelka.scanners.{m}') for m in ['scan_lsb','scan_nf']]; print('scanner imports OK'); import strelka.auxiliary.xar; assert hasattr(strelka.auxiliary.xar, 'XarArchive')") && \
+    # Remove build artifacts and packages
+    rm -rf build/ dist/ *.egg-info && \
     apt-get purge -y \
     automake \
     build-essential \
