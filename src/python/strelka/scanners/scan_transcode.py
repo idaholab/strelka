@@ -55,7 +55,18 @@ class ScanTranscode(Scanner):
             # Send extracted file back to Strelka
             self.emit_file(converted_image, name=file.name)
         except UnidentifiedImageError:
+            # Image.open() couldn't identify the format at all.
             self.flags.append("unidentified_image")
+            return
+        except Exception as e:
+            # Image.open() succeeded (the container header looked valid), but
+            # the actual decode failed later — e.g. HEIF/AVIF decoding is lazy,
+            # so a truncated or malformed file (bad iloc/box offsets, etc.)
+            # doesn't fail until convert()/save() actually reads pixel data.
+            # This can surface as ValueError, OSError, or a decoder-specific
+            # exception depending on which plugin (pillow_heif, pillow_avif,
+            # PIL's native decoders) is handling the format.
+            self.flags.append(f"{self.__class__.__name__} Exception: {str(e)[:50]}")
             return
 
         self.flags.append("transcoded")
