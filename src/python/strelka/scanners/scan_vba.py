@@ -32,7 +32,7 @@ class ScanVba(Scanner):
                     vba_code,
                 ) in extract_macros:
                     # Send extracted file back to Strelka
-                    self.emit_file(vba_code, name=f"{vba_filename}")
+                    self.emit_file(vba_code.encode("utf-8", errors="replace"), name=f"{vba_filename}")
 
                     self.event["total"]["extracted"] += 1
 
