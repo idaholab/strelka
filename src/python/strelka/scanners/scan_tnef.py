@@ -34,7 +34,7 @@ class ScanTnef(Scanner):
         self.event["total"]["attachments"] = len(tnef_attachments)
         for attachment in tnef_attachments:
             # Send extracted file back to Strelka
-            self.emit_file(attachment.data, name=attachment.name.decode())
+            self.emit_file(attachment.data, name=attachment.name)
 
             self.event["total"]["extracted"] += 1
 

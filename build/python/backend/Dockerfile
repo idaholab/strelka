@@ -102,8 +102,10 @@ RUN mkdir -p /tmp/build-xar && \
     done; \
     patch -Np1 -i ../xar-ext2-no-ecompr.patch && \
     cd xar && \
-    curl -fsSL https://git.savannah.gnu.org/cgit/config.git/plain/config.guess -o config.guess && \
-    curl -fsSL https://git.savannah.gnu.org/cgit/config.git/plain/config.sub   -o config.sub && \
+    (curl -fsSL --retry 3 --retry-delay 2 https://git.savannah.gnu.org/cgit/config.git/plain/config.guess -o config.guess || \
+     curl -fsSL https://raw.githubusercontent.com/cgitmirror/config/master/config.guess -o config.guess) && \
+    (curl -fsSL --retry 3 --retry-delay 2 https://git.savannah.gnu.org/cgit/config.git/plain/config.sub -o config.sub || \
+     curl -fsSL https://raw.githubusercontent.com/cgitmirror/config/master/config.sub -o config.sub) && \
     chmod +x config.guess config.sub && \
     sed -i 's/AC_PREREQ(\[2.72\])/AC_PREREQ([2.71])/' configure.ac && \
     autoreconf -fi && \
