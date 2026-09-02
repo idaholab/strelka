@@ -26,9 +26,10 @@ data:
               - 'application/msword'
               - 'olecf_file'
           priority: 5
-      'ScanBase64PE':
+      'ScanBase64':
         - positive:
             flavors:
+              - 'base64'
               - 'base64_pe'
           priority: 5
       'ScanBatch':
@@ -178,8 +179,8 @@ data:
             encodings:
               - classic
               - backslash
-#             - raw
-#             - hex
+              #- raw
+              #- hex
       'ScanGif':
         - positive:
             flavors:
@@ -208,8 +209,8 @@ data:
             encodings:
               - classic
               - backslash
-#             - raw
-#             - hex
+              #- raw
+              #- hex
       'ScanHtml':
         - positive:
             flavors:
@@ -270,7 +271,7 @@ data:
               - 'cpio_file'
               - 'application/x-xar'
               - 'xar_file'
-#              - 'arj_file'  # ARJ support missing from ScanLibarchive
+              #- 'arj_file'  # ARJ support missing from ScanLibarchive
               - 'iso_file'
               - 'application/x-debian-package'
               - 'debian_package_file'
