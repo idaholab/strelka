@@ -146,3 +146,5 @@ class ScanHtml(Scanner):
 
         except TypeError:
             self.flags.append("type_error")
+        except Exception as e:
+            self.flags.append(f"parse_error: {str(e)[:100]}")
